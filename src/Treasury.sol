@@ -14,9 +14,14 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract Treasury is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /// @notice Human-readable label for this treasury (e.g. "Grants", "Operations").
+    string public name;
+
     event Withdrawn(address indexed token, address indexed to, uint256 amount);
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner, string memory name_) Ownable(initialOwner) {
+        name = name_;
+    }
 
     /**
      * @notice Moves funds out of the treasury.

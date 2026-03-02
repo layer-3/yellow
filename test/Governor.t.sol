@@ -67,7 +67,7 @@ contract YellowGovernorTest is Test {
         timelock.grantRole(timelock.PROPOSER_ROLE(), deployer);
 
         // Deploy treasury owned by deployer, then transfer to timelock
-        treasury = new Treasury(deployer);
+        treasury = new Treasury(deployer, "Treasury");
         treasury.transferOwnership(address(timelock));
 
         // Schedule acceptOwnership on timelock

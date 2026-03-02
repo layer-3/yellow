@@ -73,8 +73,9 @@ contract Deploy is Script {
         console.log("YellowGovernor:", address(governor));
 
         // 5. Treasury (owned by deployer initially)
-        Treasury treasury = new Treasury(msg.sender);
-        console.log("Treasury:", address(treasury));
+        string memory treasuryName = vm.envOr("TREASURY_NAME", string("Treasury"));
+        Treasury treasury = new Treasury(msg.sender, treasuryName);
+        console.log("Treasury:", address(treasury), "-", treasuryName);
 
         // 6. Wire roles: governor as proposer + canceller on timelock
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));

@@ -82,7 +82,7 @@ TOKEN=$(echo "$DEPLOY_OUTPUT"    | grep "YellowToken:"         | awk '{print $NF
 LOCKER=$(echo "$DEPLOY_OUTPUT"   | grep "Locker:"              | awk '{print $NF}')
 TIMELOCK=$(echo "$DEPLOY_OUTPUT" | grep "TimelockController:"  | awk '{print $NF}')
 GOVERNOR=$(echo "$DEPLOY_OUTPUT" | grep "YellowGovernor:"      | awk '{print $NF}')
-TREASURY=$(echo "$DEPLOY_OUTPUT" | grep "Treasury:"            | awk '{print $NF}')
+TREASURY=$(echo "$DEPLOY_OUTPUT" | grep "^  Treasury:"         | awk '{print $2}')
 
 for name in TOKEN LOCKER TIMELOCK GOVERNOR TREASURY; do
     [[ -n "${!name}" ]] || fail "Could not parse $name address from deploy output"
@@ -110,6 +110,9 @@ send "$TIMELOCK" \
 
 OWNER=$(call "$TREASURY" "owner()(address)")
 assert_eq "$OWNER" "$TIMELOCK" "Treasury owned by Timelock"
+
+TNAME=$(call "$TREASURY" "name()(string)" | tr -d '"')
+assert_eq "$TNAME" "Treasury" "Treasury name"
 
 # ═════════════════════════════════════════════════════════════════
 #  4. Token sanity checks
