@@ -15,6 +15,11 @@ import {ILock} from "./interfaces/ILock.sol";
  *         Extends OZ Votes to act as the voting-power source for governance.
  *         Users must call `delegate(self)` to activate their voting power.
  *
+ * @dev ASSET is immutably set to YellowToken, a standard ERC-20 deployed by the
+ *      same team in the same transaction. It has a fixed supply with no mint, burn,
+ *      fee-on-transfer, or rebasing mechanics. The accounting in this vault relies
+ *      on that invariant.
+ *
  * Workflow:
  *   1. lock(amount)  — deposit tokens; can top-up while in Locked state.
  *   2. unlock()      — start the 7-day countdown.
