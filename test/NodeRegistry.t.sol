@@ -3,11 +3,11 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {ILock} from "../src/interfaces/ILock.sol";
-import {YellowLocker} from "../src/Locker.sol";
+import {NodeRegistry} from "../src/NodeRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 
 contract LockerTest is Test {
-    YellowLocker vault;
+    NodeRegistry vault;
     YellowToken token;
 
     address treasury = address(2);
@@ -18,7 +18,7 @@ contract LockerTest is Test {
 
     function setUp() public {
         token = new YellowToken(treasury);
-        vault = new YellowLocker(address(token), 14 days);
+        vault = new NodeRegistry(address(token), 14 days);
 
         // Fund alice and bob
         vm.startPrank(treasury);
@@ -39,12 +39,12 @@ contract LockerTest is Test {
 
     function test_constructor_revert_ifAssetIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAddress.selector));
-        new YellowLocker(address(0), 14 days);
+        new NodeRegistry(address(0), 14 days);
     }
 
     function test_constructor_revert_ifUnlockPeriodIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
-        new YellowLocker(address(token), 0);
+        new NodeRegistry(address(token), 0);
     }
 
     function test_constructor_setsAsset() public view {
@@ -60,7 +60,7 @@ contract LockerTest is Test {
     // -------------------------------------------------------------------------
 
     function test_unlockPeriod() public view {
-        assertEq(vault.UNLOCK_PERIOD(), 14 days);
+        assertEq(vault.NODE_UNLOCK_PERIOD(), 14 days);
     }
 
     // -------------------------------------------------------------------------

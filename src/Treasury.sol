@@ -9,7 +9,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 /**
  * @title Treasury
- * @notice Secure vault for DAO assets.
+ * @notice Secure vault for Layer-3 Foundation assets.
  */
 contract Treasury is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;

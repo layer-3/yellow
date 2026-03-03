@@ -4,26 +4,27 @@
 
 ### What is Yellow governance?
 
-Token holders lock YELLOW tokens to gain voting power and collectively manage the DAO treasury through on-chain proposals. Every decision -- from funding a grant to changing governance parameters -- goes through a transparent vote.
+Node operators lock YELLOW tokens in the NodeRegistry to gain voting power and participate in on-chain governance through proposals. App owners lock YELLOW as collateral in the AppRegistry where misbehaviour can be penalised via slashing.
 
 ### What contracts are involved?
 
 | Contract | Role |
 |---|---|
 | **YellowToken** | The ERC-20 token (fixed 10B supply, no mint/burn) |
-| **Locker** | Lock YELLOW to get voting power |
+| **NodeRegistry** | Lock YELLOW to get voting power (node operators) |
+| **AppRegistry** | Lock YELLOW as collateral, subject to slashing (app owners) |
 | **YellowGovernor** | Create and vote on proposals |
 | **TimelockController** | Enforces a delay before execution |
-| **Treasury** | Holds DAO assets (ETH and ERC-20s) |
+| **Treasury** | Holds Layer-3 Foundation assets (ETH and ERC-20s) |
 
 ---
 
-## Locking & Voting Power
+## NodeRegistry (Node Operators)
 
 ### How do I get voting power?
 
-1. Approve the Locker to spend your YELLOW tokens.
-2. Call `lock(amount)` on the Locker.
+1. Approve the NodeRegistry to spend your YELLOW tokens.
+2. Call `lock(amount)` on the NodeRegistry.
 3. Call `delegate(yourAddress)` to activate your own voting power.
 
 Step 3 is easy to forget -- **your votes won't count until you delegate**, even to yourself.
@@ -34,7 +35,7 @@ Yes. Call `lock(amount)` again while in the **Locked** state and it adds to your
 
 ### Can I delegate my votes to someone else?
 
-Yes. Call `delegate(theirAddress)` on the Locker. The delegate receives your full voting power. You can change your delegate at any time.
+Yes. Call `delegate(theirAddress)` on the NodeRegistry. The delegate receives your full voting power. You can change your delegate at any time.
 
 ### How do I get my tokens back?
 
@@ -56,6 +57,26 @@ Yes. Call `relock()` at any time before `withdraw()`. Your tokens stay locked an
 ### What if I try to lock tokens while unlocking?
 
 The transaction reverts with `AlreadyUnlocking`. Cancel the unlock with `relock()` first, then lock additional tokens.
+
+---
+
+## AppRegistry (App Owners)
+
+### How does the AppRegistry work?
+
+App owners lock YELLOW as collateral. The lock/unlock/withdraw state machine is the same as NodeRegistry, but there is **no voting power** -- the AppRegistry does not participate in governance.
+
+### What is slashing?
+
+If an app owner violates protocol rules, the **adjudicator** can call `slash(user, amount)` to confiscate part or all of their locked collateral. Slashed tokens are transferred to the adjudicator for redistribution.
+
+### Can I be slashed while unlocking?
+
+Yes. Slashing applies in both the **Locked** and **Unlocking** states. Starting an unlock does not protect you from slashing. If your entire balance is slashed, your state resets to **Idle**.
+
+### Who is the adjudicator?
+
+The adjudicator is an address set at deployment that is authorised to slash participants. It may be a multisig, a dispute resolution contract, or another mechanism determined by the Layer-3 Foundation.
 
 ---
 
@@ -104,11 +125,11 @@ ETH and any ERC-20 token. It has a `receive()` function so it can accept ETH tra
 
 ### How are funds withdrawn from the Treasury?
 
-Only through a governance vote. A proposal must pass, survive the timelock delay, and then anyone can execute it. The Treasury's `withdraw()` function supports both ETH (`token = address(0)`) and ERC-20 tokens.
+The Treasury is owned by the Layer-3 Foundation. The Foundation address can call `withdraw()` directly -- no governance vote is required.
 
 ### Who owns the Treasury?
 
-The TimelockController, via a two-step ownership transfer (`Ownable2Step`). No single person or key can move funds -- it requires a full governance vote.
+The Layer-3 Foundation, via direct ownership (`Ownable2Step`). This is different from the governance-controlled model -- the Foundation manages treasury assets independently.
 
 ---
 
@@ -121,9 +142,10 @@ The TimelockController, via a two-step ownership transfer (`Ownable2Step`). No s
 | Voting delay | ~1 day | 7,200 blocks at 12s/block |
 | Voting period | ~1 week | 50,400 blocks at 12s/block |
 | Quorum | 4% of locked supply | Never below 100M YELLOW floor |
-| Unlock period | 14 days | Locker withdrawal waiting period |
+| NodeRegistry unlock period | 14 days | Node operator withdrawal waiting period |
+| AppRegistry unlock period | 14 days | App owner withdrawal waiting period |
 | Timelock delay | 2 days | Delay before proposal execution |
 
 ### Can these parameters be changed?
 
-Yes, through governance. The Governor inherits `GovernorSettings` which allows updating voting delay, voting period, and proposal threshold via proposals. The quorum floor can also be updated via `setQuorumFloor()`, which is restricted to governance-only.
+Yes, governance parameters can be changed through governance. The Governor inherits `GovernorSettings` which allows updating voting delay, voting period, and proposal threshold via proposals. The quorum floor can also be updated via `setQuorumFloor()`, which is restricted to governance-only.

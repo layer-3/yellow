@@ -15,7 +15,7 @@ import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 /**
  * @title YellowGovernor
  * @notice On-chain governance for the Yellow Network DAO.
- *         Voting power is derived from YELLOW tokens locked in the Locker.
+ *         Voting power is derived from YELLOW tokens locked in the NodeRegistry.
  *         Proposals are queued through a TimelockController before execution.
  *         Enforces a minimum quorum floor so quorum never drops below a
  *         meaningful absolute value even if total locked supply shrinks.

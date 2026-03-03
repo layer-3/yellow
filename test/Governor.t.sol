@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {YellowLocker} from "../src/Locker.sol";
+import {NodeRegistry} from "../src/NodeRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 import {YellowGovernor} from "../src/Governor.sol";
 import {Treasury} from "../src/Treasury.sol";
@@ -10,17 +10,17 @@ import {ILock} from "../src/interfaces/ILock.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 contract YellowGovernorTest is Test {
     YellowToken token;
-    YellowLocker locker;
+    NodeRegistry locker;
     TimelockController timelock;
     YellowGovernor governor;
     Treasury treasury;
 
     address deployer = address(1);
     address treasuryAddr = address(2);
+    address foundation = address(6);
     address alice = address(3);
     address bob = address(4);
 
@@ -39,8 +39,8 @@ contract YellowGovernorTest is Test {
         // Deploy token
         token = new YellowToken(deployer);
 
-        // Deploy locker
-        locker = new YellowLocker(address(token), 14 days);
+        // Deploy locker (NodeRegistry)
+        locker = new NodeRegistry(address(token), 14 days);
 
         // Deploy timelock (deployer as temp admin)
         address[] memory proposers = new address[](0);
@@ -63,30 +63,17 @@ contract YellowGovernorTest is Test {
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
         timelock.grantRole(timelock.CANCELLER_ROLE(), address(governor));
 
-        // Grant deployer temporary proposer role to schedule acceptOwnership
-        timelock.grantRole(timelock.PROPOSER_ROLE(), deployer);
-
-        // Deploy treasury owned by deployer, then transfer to timelock
-        treasury = new Treasury(deployer, "Treasury");
-        treasury.transferOwnership(address(timelock));
-
-        // Schedule acceptOwnership on timelock
-        bytes memory acceptData = abi.encodeCall(Ownable2Step.acceptOwnership, ());
-        timelock.schedule(address(treasury), 0, acceptData, bytes32(0), bytes32(0), TIMELOCK_DELAY);
-
-        // Warp past timelock delay and execute
-        vm.warp(block.timestamp + TIMELOCK_DELAY);
-        timelock.execute(address(treasury), 0, acceptData, bytes32(0), bytes32(0));
-
-        // Revoke deployer's temporary proposer role and admin
-        timelock.revokeRole(timelock.PROPOSER_ROLE(), deployer);
+        // Renounce deployer admin on timelock
         timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
+
+        // Deploy treasury owned by Foundation directly
+        treasury = new Treasury(foundation, "Treasury");
 
         // Fund alice and bob
         require(token.transfer(alice, 10_000_000 ether));
         require(token.transfer(bob, 10_000_000 ether));
 
-        // Send some tokens to treasury for governance withdrawal tests
+        // Send some tokens to timelock for governance tests
         require(token.transfer(address(timelock), 1_000_000 ether));
 
         vm.stopPrank();
@@ -112,11 +99,11 @@ contract YellowGovernorTest is Test {
     // Setup verification
     // -------------------------------------------------------------------------
 
-    function test_setup_treasuryOwnedByTimelock() public view {
-        assertEq(treasury.owner(), address(timelock));
+    function test_setup_treasuryOwnedByFoundation() public view {
+        assertEq(treasury.owner(), foundation);
     }
 
-    function test_setup_governorPointsToLocker() public view {
+    function test_setup_governorPointsToNodeRegistry() public view {
         assertEq(address(governor.token()), address(locker));
     }
 
@@ -250,46 +237,21 @@ contract YellowGovernorTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Treasury control via governance
+    // Treasury is Foundation-owned (not governance-controlled)
     // -------------------------------------------------------------------------
 
-    function test_governance_canWithdrawFromTreasury() public {
+    function test_treasury_foundationCanWithdraw() public {
         uint256 amount = 100 ether;
 
-        // Build proposal: treasury.withdraw(token, alice, amount)
-        address[] memory targets = new address[](1);
-        targets[0] = address(treasury);
-        uint256[] memory values = new uint256[](1);
-        values[0] = 0;
-        bytes[] memory calldatas = new bytes[](1);
-        calldatas[0] = abi.encodeCall(Treasury.withdraw, (address(token), alice, amount));
-        string memory description = "Transfer tokens from treasury to alice";
-
-        // Send tokens to treasury (via timelock which is owner)
+        // Send tokens to treasury
         vm.prank(deployer);
         require(token.transfer(address(treasury), amount));
 
         uint256 aliceBalBefore = token.balanceOf(alice);
 
-        // Propose
-        vm.prank(alice);
-        uint256 proposalId = governor.propose(targets, values, calldatas, description);
-
-        // Vote
-        vm.roll(block.number + VOTING_DELAY + 1);
-        vm.prank(alice);
-        governor.castVote(proposalId, 1);
-        vm.prank(bob);
-        governor.castVote(proposalId, 1);
-
-        // Queue
-        vm.roll(block.number + VOTING_PERIOD + 1);
-        bytes32 descriptionHash = keccak256(bytes(description));
-        governor.queue(targets, values, calldatas, descriptionHash);
-
-        // Execute
-        vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
-        governor.execute(targets, values, calldatas, descriptionHash);
+        // Foundation withdraws directly
+        vm.prank(foundation);
+        treasury.withdraw(address(token), alice, amount);
 
         assertEq(token.balanceOf(alice), aliceBalBefore + amount);
     }
@@ -378,10 +340,7 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + VOTING_PERIOD + 1);
 
-        // Quorum is 4% of 0 = 0, and for votes = 0, so this passes trivially?
-        // Actually OZ quorum(0 total supply) = 0, and 0 >= 0 is true.
-        // But GovernorCountingSimple requires forVotes > againstVotes for success,
-        // and 0 > 0 is false — so proposal is Defeated.
+        // Quorum floor = 50_000 ether, forVotes = 0 → defeated
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
     }
 

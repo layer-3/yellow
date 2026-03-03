@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {YellowLocker} from "../src/Locker.sol";
+import {NodeRegistry} from "../src/NodeRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 
 contract LockerVotesTest is Test {
-    YellowLocker locker;
+    NodeRegistry locker;
     YellowToken token;
 
     address treasury = address(2);
@@ -18,7 +18,7 @@ contract LockerVotesTest is Test {
 
     function setUp() public {
         token = new YellowToken(treasury);
-        locker = new YellowLocker(address(token), 14 days);
+        locker = new NodeRegistry(address(token), 14 days);
 
         vm.startPrank(treasury);
         require(token.transfer(alice, 10_000 ether));
