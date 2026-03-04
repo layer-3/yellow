@@ -10,8 +10,9 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ILock} from "./interfaces/ILock.sol";
 
 /**
- * @title Locker
- * @notice Single-asset vault with a 7-day time-locked withdrawal mechanism.
+ * @title NodeRegistry
+ * @notice Node operator registry with governance voting. Operators lock YELLOW
+ *         tokens to register and gain voting power in the Yellow Network DAO.
  *         Extends OZ Votes to act as the voting-power source for governance.
  *         Users must call `delegate(self)` to activate their voting power.
  *
@@ -22,23 +23,23 @@ import {ILock} from "./interfaces/ILock.sol";
  *
  * Workflow:
  *   1. lock(amount)  — deposit tokens; can top-up while in Locked state.
- *   2. unlock()      — start the 7-day countdown.
+ *   2. unlock()      — start the countdown.
  *   3. withdraw()    — after the period elapses, receive the full balance.
  */
-contract YellowLocker is ILock, ReentrancyGuard, Votes {
+contract NodeRegistry is ILock, ReentrancyGuard, Votes {
     using SafeERC20 for IERC20;
 
     address public immutable ASSET;
-    uint256 public immutable UNLOCK_PERIOD;
+    uint256 public immutable NODE_UNLOCK_PERIOD;
 
     mapping(address user => uint256 balance) internal _balances;
     mapping(address user => uint256 unlockTimestamp) internal _unlockTimestamps;
 
-    constructor(address asset_, uint256 unlockPeriod_) EIP712("YellowLocker", "1") {
+    constructor(address asset_, uint256 unlockPeriod_) EIP712("NodeRegistry", "1") {
         if (asset_ == address(0)) revert InvalidAddress();
         if (unlockPeriod_ == 0) revert InvalidAmount();
         ASSET = asset_;
-        UNLOCK_PERIOD = unlockPeriod_;
+        NODE_UNLOCK_PERIOD = unlockPeriod_;
     }
 
     /// @inheritdoc ILock
@@ -86,7 +87,7 @@ contract YellowLocker is ILock, ReentrancyGuard, Votes {
         if (balance == 0) revert NotLocked();
         if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
 
-        uint256 availableAt = block.timestamp + UNLOCK_PERIOD;
+        uint256 availableAt = block.timestamp + NODE_UNLOCK_PERIOD;
         _unlockTimestamps[msg.sender] = availableAt;
 
         _transferVotingUnits(msg.sender, address(0), balance);
