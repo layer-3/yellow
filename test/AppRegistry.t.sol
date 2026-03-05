@@ -297,11 +297,7 @@ contract AppRegistryTest_slashCooldown is AppRegistryTest_slash_base {
         appRegistry.slash(alice, 100 ether, treasury, "first");
 
         vm.prank(adjudicator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                AppRegistry.SlashCooldownActive.selector, block.timestamp + COOLDOWN
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(AppRegistry.SlashCooldownActive.selector, block.timestamp + COOLDOWN));
         appRegistry.slash(bob, 100 ether, treasury, "second");
     }
 

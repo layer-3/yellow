@@ -45,8 +45,9 @@ Node operator registry with governance voting. Operators lock YELLOW tokens and 
 
 Registry for app owners who lock YELLOW as collateral. Implements the same lock/unlock/withdraw state machine as NodeRegistry but without governance voting. An adjudicator can slash a participant's balance in both Locked and Unlocking states as penalty for misbehaviour.
 
-- `slash(user, amount)` -- callable only by the adjudicator. Reduces the user's balance and transfers slashed tokens to the adjudicator.
+- `slash(user, amount, recipient, decision)` -- callable only by an address with `ADJUDICATOR_ROLE`. Reduces the user's balance and transfers slashed tokens to the recipient.
 - Full slash resets the user's state to Idle.
+- **Slash cooldown** -- a global cooldown can be set by the admin (`DEFAULT_ADMIN_ROLE`) via `setSlashCooldown(seconds)` to rate-limit slashing. This prevents a rogue adjudicator from batch-draining all users in a single transaction, giving the admin time to revoke the role. Set to `0` to disable (default).
 
 ### YellowGovernor
 
@@ -68,7 +69,9 @@ OpenZeppelin TimelockController. Enforces a delay between proposal approval and 
 
 ### Treasury
 
-Secure vault for Layer-3 Foundation assets, supporting ETH and ERC-20 withdrawals. Owned directly by the Foundation address via `Ownable2Step`.
+Secure vault for Layer-3 Foundation assets, supporting ETH and ERC-20 transfers. Owned directly by the Foundation address via `Ownable2Step`.
+
+- `transfer(token, to, amount)` -- moves funds out of the treasury. Use `address(0)` for ETH.
 
 ## Development
 

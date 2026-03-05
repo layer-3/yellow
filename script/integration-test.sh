@@ -62,60 +62,80 @@ cast block-number --rpc-url "$RPC" > /dev/null 2>&1 || fail "Anvil failed to sta
 pass "Anvil running (PID $ANVIL_PID)"
 
 # ═════════════════════════════════════════════════════════════════
-#  2. Deploy governance stack
+#  2. Deploy Token
 # ═════════════════════════════════════════════════════════════════
-step "Deploying governance stack"
+step "Deploying YellowToken"
 
-DEPLOY_OUTPUT=$(TREASURY_ADDRESS=$DEPLOYER \
+TOKEN_OUTPUT=$(FOUNDATION_ADDRESS=$DEPLOYER \
+  forge script script/DeployToken.s.sol \
+    --rpc-url "$RPC" \
+    --broadcast \
+    --private-key "$DEPLOYER_PK" 2>&1)
+
+TOKEN=$(echo "$TOKEN_OUTPUT" | grep "YellowToken:" | awk '{print $2}')
+[[ -n "$TOKEN" ]] || fail "Could not parse TOKEN address from deploy output"
+echo "  Token: $TOKEN"
+pass "Token deployed"
+
+# ═════════════════════════════════════════════════════════════════
+#  3. Deploy Registry + Governance stack
+# ═════════════════════════════════════════════════════════════════
+step "Deploying Registry + Governance stack"
+
+REGISTRY_OUTPUT=$(TOKEN_ADDRESS=$TOKEN \
+  ADJUDICATOR_ADDRESS=$DEPLOYER \
+  PROPOSAL_GUARDIAN=$DEPLOYER \
   VOTING_DELAY=1 \
   VOTING_PERIOD=10 \
   PROPOSAL_THRESHOLD=0 \
   QUORUM_NUMERATOR=4 \
   QUORUM_FLOOR=0 \
+  VOTE_EXTENSION=0 \
   TIMELOCK_DELAY=1 \
-  forge script script/Deploy.s.sol \
+  forge script script/DeployRegistry.s.sol \
     --rpc-url "$RPC" \
     --broadcast \
     --private-key "$DEPLOYER_PK" 2>&1)
 
-TOKEN=$(echo "$DEPLOY_OUTPUT"    | grep "YellowToken:"         | awk '{print $NF}')
-LOCKER=$(echo "$DEPLOY_OUTPUT"   | grep "Locker:"              | awk '{print $NF}')
-TIMELOCK=$(echo "$DEPLOY_OUTPUT" | grep "TimelockController:"  | awk '{print $NF}')
-GOVERNOR=$(echo "$DEPLOY_OUTPUT" | grep "YellowGovernor:"      | awk '{print $NF}')
-TREASURY=$(echo "$DEPLOY_OUTPUT" | grep "^  Treasury:"         | awk '{print $2}')
+NODE_REGISTRY=$(echo "$REGISTRY_OUTPUT" | grep "NodeRegistry:"        | awk '{print $2}')
+APP_REGISTRY=$(echo "$REGISTRY_OUTPUT"  | grep "AppRegistry:"         | awk '{print $2}')
+TIMELOCK=$(echo "$REGISTRY_OUTPUT"      | grep "TimelockController:"  | awk '{print $2}')
+GOVERNOR=$(echo "$REGISTRY_OUTPUT"      | grep "YellowGovernor:"      | awk '{print $2}')
 
-for name in TOKEN LOCKER TIMELOCK GOVERNOR TREASURY; do
+for name in NODE_REGISTRY APP_REGISTRY TIMELOCK GOVERNOR; do
     [[ -n "${!name}" ]] || fail "Could not parse $name address from deploy output"
 done
 
-echo "  Token:     $TOKEN"
-echo "  Locker:    $LOCKER"
-echo "  Timelock:  $TIMELOCK"
-echo "  Governor:  $GOVERNOR"
-echo "  Treasury:  $TREASURY"
-pass "Deployment complete"
+echo "  NodeRegistry: $NODE_REGISTRY"
+echo "  AppRegistry:  $APP_REGISTRY"
+echo "  Timelock:     $TIMELOCK"
+echo "  Governor:     $GOVERNOR"
+pass "Registry + Governance deployed"
 
 # ═════════════════════════════════════════════════════════════════
-#  3. Complete Treasury ownership transfer via Timelock
+#  4. Deploy Treasury (owned by Timelock)
 # ═════════════════════════════════════════════════════════════════
-step "Completing Treasury ownership transfer"
+step "Deploying Treasury (owned by Timelock)"
 
-warp 2; mine 1
+TREASURY_OUTPUT=$(FOUNDATION_ADDRESS=$TIMELOCK \
+  forge script script/DeployTreasury.s.sol \
+    --rpc-url "$RPC" \
+    --broadcast \
+    --private-key "$DEPLOYER_PK" 2>&1)
 
-ACCEPT_DATA=$(cast calldata "acceptOwnership()")
-send "$TIMELOCK" \
-    "execute(address,uint256,bytes,bytes32,bytes32)" \
-    "$TREASURY" 0 "$ACCEPT_DATA" "$ZERO_HASH" "$ZERO_HASH" \
-    --private-key "$DEPLOYER_PK"
+TREASURY=$(echo "$TREASURY_OUTPUT" | grep "Treasury:" | awk '{print $2}')
+[[ -n "$TREASURY" ]] || fail "Could not parse TREASURY address from deploy output"
+echo "  Treasury: $TREASURY"
 
 OWNER=$(call "$TREASURY" "owner()(address)")
 assert_eq "$OWNER" "$TIMELOCK" "Treasury owned by Timelock"
 
 TNAME=$(call "$TREASURY" "name()(string)" | tr -d '"')
 assert_eq "$TNAME" "Treasury" "Treasury name"
+pass "Treasury deployed"
 
 # ═════════════════════════════════════════════════════════════════
-#  4. Token sanity checks
+#  6. Token sanity checks
 # ═════════════════════════════════════════════════════════════════
 step "Verifying token"
 
@@ -132,7 +152,7 @@ SYMBOL=$(call "$TOKEN" "symbol()(string)" | tr -d '"')
 assert_eq "$SYMBOL" "YELLOW" "Token symbol"
 
 # ═════════════════════════════════════════════════════════════════
-#  5. Fund Treasury (ETH + YELLOW)
+#  7. Fund Treasury (ETH + YELLOW)
 # ═════════════════════════════════════════════════════════════════
 step "Funding Treasury"
 
@@ -146,81 +166,80 @@ T_BAL=$(call "$TOKEN" "balanceOf(address)(uint256)" "$TREASURY")
 assert_eq "$T_BAL" "$MILLION" "Treasury holds 1 M YELLOW"
 
 # ═════════════════════════════════════════════════════════════════
-#  6. Locker — lock & delegate
+#  8. NodeRegistry — lock & delegate
 # ═════════════════════════════════════════════════════════════════
-step "Locker: lock + delegate"
+step "NodeRegistry: lock + delegate"
 
 ALICE_FUND="500000000000000000000000000"   # 500 M
 LOCK_AMT="200000000000000000000000000"     # 200 M
 
 send "$TOKEN" "transfer(address,uint256)" "$ALICE" "$ALICE_FUND" --private-key "$DEPLOYER_PK"
-send "$TOKEN" "approve(address,uint256)" "$LOCKER" "$LOCK_AMT"   --private-key "$ALICE_PK"
-send "$LOCKER" "lock(uint256)" "$LOCK_AMT"                       --private-key "$ALICE_PK"
+send "$TOKEN" "approve(address,uint256)" "$NODE_REGISTRY" "$LOCK_AMT"   --private-key "$ALICE_PK"
+send "$NODE_REGISTRY" "lock(address,uint256)" "$ALICE" "$LOCK_AMT"      --private-key "$ALICE_PK"
 
-assert_eq "$(call "$LOCKER" "balanceOf(address)(uint256)" "$ALICE")" "$LOCK_AMT" "Alice locked 200 M"
-assert_eq "$(call "$LOCKER" "lockStateOf(address)(uint8)" "$ALICE")" "1"         "Alice state = Locked"
+assert_eq "$(call "$NODE_REGISTRY" "balanceOf(address)(uint256)" "$ALICE")" "$LOCK_AMT" "Alice locked 200 M"
+assert_eq "$(call "$NODE_REGISTRY" "lockStateOf(address)(uint8)" "$ALICE")" "1"         "Alice state = Locked"
 
-send "$LOCKER" "delegate(address)" "$ALICE" --private-key "$ALICE_PK"
 mine 1
 
-assert_eq "$(call "$LOCKER" "getVotes(address)(uint256)" "$ALICE")" "$LOCK_AMT" "Alice voting power = 200 M"
+assert_eq "$(call "$NODE_REGISTRY" "getVotes(address)(uint256)" "$ALICE")" "$LOCK_AMT" "Alice voting power = 200 M (auto-delegated)"
 
 # ═════════════════════════════════════════════════════════════════
-#  7. Locker — unlock → relock round-trip
+#  9. NodeRegistry — unlock → relock round-trip
 # ═════════════════════════════════════════════════════════════════
-step "Locker: unlock → relock"
+step "NodeRegistry: unlock → relock"
 
-send "$LOCKER" "unlock()" --private-key "$ALICE_PK"
-assert_eq "$(call "$LOCKER" "lockStateOf(address)(uint8)" "$ALICE")"  "2" "State = Unlocking"
-assert_eq "$(call "$LOCKER" "getVotes(address)(uint256)" "$ALICE")"   "0" "Votes dropped to 0"
+send "$NODE_REGISTRY" "unlock()" --private-key "$ALICE_PK"
+assert_eq "$(call "$NODE_REGISTRY" "lockStateOf(address)(uint8)" "$ALICE")"  "2" "State = Unlocking"
+assert_eq "$(call "$NODE_REGISTRY" "getVotes(address)(uint256)" "$ALICE")"   "0" "Votes dropped to 0"
 
-send "$LOCKER" "relock()" --private-key "$ALICE_PK"
-assert_eq "$(call "$LOCKER" "lockStateOf(address)(uint8)" "$ALICE")"  "1"         "State = Locked"
-assert_eq "$(call "$LOCKER" "getVotes(address)(uint256)" "$ALICE")"   "$LOCK_AMT" "Votes restored"
+send "$NODE_REGISTRY" "relock()" --private-key "$ALICE_PK"
+assert_eq "$(call "$NODE_REGISTRY" "lockStateOf(address)(uint8)" "$ALICE")"  "1"         "State = Locked"
+assert_eq "$(call "$NODE_REGISTRY" "getVotes(address)(uint256)" "$ALICE")"   "$LOCK_AMT" "Votes restored"
 
 # ═════════════════════════════════════════════════════════════════
-#  8. Locker — full unlock → withdraw (Bob)
+#  10. NodeRegistry — full unlock → withdraw (Bob)
 # ═════════════════════════════════════════════════════════════════
-step "Locker: lock → unlock → wait 14 d → withdraw (Bob)"
+step "NodeRegistry: lock → unlock → wait 14 d → withdraw (Bob)"
 
 BOB_AMT="100000000000000000000000000"  # 100 M
 
-send "$TOKEN"  "transfer(address,uint256)" "$BOB" "$BOB_AMT"    --private-key "$DEPLOYER_PK"
-send "$TOKEN"  "approve(address,uint256)" "$LOCKER" "$BOB_AMT"  --private-key "$BOB_PK"
-send "$LOCKER" "lock(uint256)" "$BOB_AMT"                       --private-key "$BOB_PK"
-send "$LOCKER" "unlock()"                                        --private-key "$BOB_PK"
+send "$TOKEN"          "transfer(address,uint256)" "$BOB" "$BOB_AMT"           --private-key "$DEPLOYER_PK"
+send "$TOKEN"          "approve(address,uint256)" "$NODE_REGISTRY" "$BOB_AMT"  --private-key "$BOB_PK"
+send "$NODE_REGISTRY"  "lock(address,uint256)" "$BOB" "$BOB_AMT"              --private-key "$BOB_PK"
+send "$NODE_REGISTRY"  "unlock()"                                              --private-key "$BOB_PK"
 
 # Fast-forward 14 days
 warp 1209601; mine 1
 
 BOB_BEFORE=$(call "$TOKEN" "balanceOf(address)(uint256)" "$BOB")
-send "$LOCKER" "withdraw()" --private-key "$BOB_PK"
+send "$NODE_REGISTRY" "withdraw(address)" "$BOB" --private-key "$BOB_PK"
 BOB_AFTER=$(call "$TOKEN" "balanceOf(address)(uint256)" "$BOB")
 
-assert_eq "$(call "$LOCKER" "lockStateOf(address)(uint8)" "$BOB")"  "0"       "Bob state = Idle"
-assert_eq "$(call "$LOCKER" "balanceOf(address)(uint256)" "$BOB")"  "0"       "Locker balance zeroed"
+assert_eq "$(call "$NODE_REGISTRY" "lockStateOf(address)(uint8)" "$BOB")"  "0"       "Bob state = Idle"
+assert_eq "$(call "$NODE_REGISTRY" "balanceOf(address)(uint256)" "$BOB")"  "0"       "NodeRegistry balance zeroed"
 assert_eq "$BOB_BEFORE" "0"        "Bob token balance was 0 before withdraw"
 assert_eq "$BOB_AFTER"  "$BOB_AMT" "Bob received 100 M back"
 
 # ═════════════════════════════════════════════════════════════════
-#  9. Governance — propose → vote → queue → execute (ETH)
+#  11. Governance — propose → vote → queue → execute (ETH)
 # ═════════════════════════════════════════════════════════════════
-step "Governance: ETH withdrawal proposal"
+step "Governance: ETH transfer proposal"
 
 mine 1   # checkpoint block
 
-WITHDRAW_CD=$(cast calldata "withdraw(address,address,uint256)" "$ADDR_ZERO" "$ALICE" "1000000000000000000")
+TRANSFER_CD=$(cast calldata "transfer(address,address,uint256)" "$ADDR_ZERO" "$ALICE" "1000000000000000000")
 DESC="Send 1 ETH to Alice"
 DESC_HASH=$(cast keccak -- "$DESC")
 
 PROPOSAL_ID=$(call "$GOVERNOR" \
     "hashProposal(address[],uint256[],bytes[],bytes32)(uint256)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD]" "$DESC_HASH")
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD]" "$DESC_HASH")
 echo "  Proposal ID: $PROPOSAL_ID"
 
 # Propose
 send "$GOVERNOR" "propose(address[],uint256[],bytes[],string)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD]" "$DESC" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD]" "$DESC" \
     --private-key "$ALICE_PK"
 assert_eq "$(call "$GOVERNOR" "state(uint256)(uint8)" "$PROPOSAL_ID")" "0" "State = Pending"
 
@@ -238,7 +257,7 @@ assert_eq "$(call "$GOVERNOR" "state(uint256)(uint8)" "$PROPOSAL_ID")" "4" "Stat
 
 # Queue through Timelock
 send "$GOVERNOR" "queue(address[],uint256[],bytes[],bytes32)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD]" "$DESC_HASH" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD]" "$DESC_HASH" \
     --private-key "$ALICE_PK"
 assert_eq "$(call "$GOVERNOR" "state(uint256)(uint8)" "$PROPOSAL_ID")" "5" "State = Queued"
 
@@ -247,7 +266,7 @@ warp 2; mine 1
 
 # Execute
 send "$GOVERNOR" "execute(address[],uint256[],bytes[],bytes32)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD]" "$DESC_HASH" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD]" "$DESC_HASH" \
     --private-key "$ALICE_PK"
 assert_eq "$(call "$GOVERNOR" "state(uint256)(uint8)" "$PROPOSAL_ID")" "7" "State = Executed"
 
@@ -255,21 +274,21 @@ TREASURY_ETH=$(cast balance "$TREASURY" --rpc-url "$RPC")
 assert_eq "$TREASURY_ETH" "9000000000000000000" "Treasury balance = 9 ETH"
 
 # ═════════════════════════════════════════════════════════════════
-#  10. Governance — propose → vote → queue → execute (ERC-20)
+#  12. Governance — propose → vote → queue → execute (ERC-20)
 # ═════════════════════════════════════════════════════════════════
-step "Governance: ERC-20 withdrawal proposal"
+step "Governance: ERC-20 transfer proposal"
 
-WITHDRAW_AMOUNT="500000000000000000000000"  # 500 K
-WITHDRAW_CD2=$(cast calldata "withdraw(address,address,uint256)" "$TOKEN" "$BOB" "$WITHDRAW_AMOUNT")
+TRANSFER_AMOUNT="500000000000000000000000"  # 500 K
+TRANSFER_CD2=$(cast calldata "transfer(address,address,uint256)" "$TOKEN" "$BOB" "$TRANSFER_AMOUNT")
 DESC2="Send 500K YELLOW to Bob"
 DESC_HASH2=$(cast keccak -- "$DESC2")
 
 PROPOSAL_ID2=$(call "$GOVERNOR" \
     "hashProposal(address[],uint256[],bytes[],bytes32)(uint256)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD2]" "$DESC_HASH2")
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD2]" "$DESC_HASH2")
 
 send "$GOVERNOR" "propose(address[],uint256[],bytes[],string)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD2]" "$DESC2" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD2]" "$DESC2" \
     --private-key "$ALICE_PK"
 
 mine 2
@@ -277,13 +296,13 @@ send "$GOVERNOR" "castVote(uint256,uint8)" "$PROPOSAL_ID2" 1 --private-key "$ALI
 mine 11
 
 send "$GOVERNOR" "queue(address[],uint256[],bytes[],bytes32)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD2]" "$DESC_HASH2" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD2]" "$DESC_HASH2" \
     --private-key "$ALICE_PK"
 
 warp 2; mine 1
 
 send "$GOVERNOR" "execute(address[],uint256[],bytes[],bytes32)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD2]" "$DESC_HASH2" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD2]" "$DESC_HASH2" \
     --private-key "$ALICE_PK"
 
 assert_eq "$(call "$GOVERNOR" "state(uint256)(uint8)" "$PROPOSAL_ID2")" "7" "State = Executed"
@@ -293,20 +312,20 @@ assert_eq "$(call "$TOKEN" "balanceOf(address)(uint256)" "$TREASURY")" "$REMAINI
 pass "Bob received 500 K YELLOW"
 
 # ═════════════════════════════════════════════════════════════════
-#  11. Governance — defeated proposal
+#  13. Governance — defeated proposal
 # ═════════════════════════════════════════════════════════════════
 step "Governance: defeated proposal"
 
-WITHDRAW_CD3=$(cast calldata "withdraw(address,address,uint256)" "$ADDR_ZERO" "$BOB" "1000000000000000000")
+TRANSFER_CD3=$(cast calldata "transfer(address,address,uint256)" "$ADDR_ZERO" "$BOB" "1000000000000000000")
 DESC3="Drain ETH (should fail)"
 DESC_HASH3=$(cast keccak -- "$DESC3")
 
 PROPOSAL_ID3=$(call "$GOVERNOR" \
     "hashProposal(address[],uint256[],bytes[],bytes32)(uint256)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD3]" "$DESC_HASH3")
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD3]" "$DESC_HASH3")
 
 send "$GOVERNOR" "propose(address[],uint256[],bytes[],string)" \
-    "[$TREASURY]" "[0]" "[$WITHDRAW_CD3]" "$DESC3" \
+    "[$TREASURY]" "[0]" "[$TRANSFER_CD3]" "$DESC3" \
     --private-key "$ALICE_PK"
 
 mine 2
