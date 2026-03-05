@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ILock} from "./interfaces/ILock.sol";
+import {ILock2} from "./interfaces/ILock2.sol";
 
 /**
  * @title NonSlashableAppRegistry
@@ -23,7 +23,7 @@ import {ILock} from "./interfaces/ILock.sol";
  *   2. unlock()      — start the countdown.
  *   3. withdraw()    — after the period elapses, receive the full balance.
  */
-contract NonSlashableAppRegistry is ILock, ReentrancyGuard {
+contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public immutable ASSET;
@@ -43,24 +43,24 @@ contract NonSlashableAppRegistry is ILock, ReentrancyGuard {
     // ILock view functions
     // -------------------------------------------------------------------------
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function asset() external view returns (address) {
         return ASSET;
     }
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function lockStateOf(address user) external view returns (LockState) {
         if (_balances[user] == 0) return LockState.Idle;
         if (_unlockTimestamps[user] == 0) return LockState.Locked;
         return LockState.Unlocking;
     }
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function balanceOf(address user) external view returns (uint256) {
         return _balances[user];
     }
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function unlockTimestampOf(address user) external view returns (uint256) {
         return _unlockTimestamps[user];
     }
@@ -69,56 +69,59 @@ contract NonSlashableAppRegistry is ILock, ReentrancyGuard {
     // ILock mutating functions
     // -------------------------------------------------------------------------
 
-    /// @inheritdoc ILock
-    function lock(uint256 amount) external nonReentrant {
+    /// @inheritdoc ILock2
+    function lock(uint256 amount, address target) external nonReentrant {
         require(amount != 0, InvalidAmount());
-        require(_unlockTimestamps[msg.sender] == 0, AlreadyUnlocking());
+        require(_unlockTimestamps[target] == 0, AlreadyUnlocking());
 
         uint256 balanceBefore = IERC20(ASSET).balanceOf(address(this));
         IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = IERC20(ASSET).balanceOf(address(this)) - balanceBefore;
 
-        uint256 newBalance = _balances[msg.sender] + received;
-        _balances[msg.sender] = newBalance;
+        uint256 newBalance = _balances[target] + received;
+        _balances[target] = newBalance;
 
-        emit Locked(msg.sender, newBalance);
+        emit Locked(target, received, newBalance);
     }
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function unlock() external {
-        uint256 balance = _balances[msg.sender];
+        address account = msg.sender;
+        uint256 balance = _balances[account];
         require(balance != 0, NotLocked());
-        require(_unlockTimestamps[msg.sender] == 0, AlreadyUnlocking());
+        require(_unlockTimestamps[account] == 0, AlreadyUnlocking());
 
         uint256 availableAt = block.timestamp + UNLOCK_PERIOD;
-        _unlockTimestamps[msg.sender] = availableAt;
+        _unlockTimestamps[account] = availableAt;
 
-        emit UnlockInitiated(msg.sender, balance, availableAt);
+        emit UnlockInitiated(account, balance, availableAt);
     }
 
-    /// @inheritdoc ILock
+    /// @inheritdoc ILock2
     function relock() external {
-        require(_unlockTimestamps[msg.sender] != 0, NotUnlocking());
+        address account = msg.sender;
+        require(_unlockTimestamps[account] != 0, NotUnlocking());
 
-        uint256 balance = _balances[msg.sender];
-        _unlockTimestamps[msg.sender] = 0;
+        uint256 balance = _balances[account];
+        _unlockTimestamps[account] = 0;
 
-        emit Relocked(msg.sender, balance);
+        emit Relocked(account, balance);
     }
 
-    /// @inheritdoc ILock
-    function withdraw() external nonReentrant {
-        uint256 unlockTimestamp = _unlockTimestamps[msg.sender];
+    /// @inheritdoc ILock2
+    function withdraw(address destination) external nonReentrant {
+        address account = msg.sender;
+        uint256 unlockTimestamp = _unlockTimestamps[account];
         require(unlockTimestamp != 0, NotUnlocking());
         require(block.timestamp >= unlockTimestamp, UnlockPeriodNotElapsed(unlockTimestamp));
 
-        uint256 amount = _balances[msg.sender];
+        uint256 amount = _balances[account];
 
-        _balances[msg.sender] = 0;
-        _unlockTimestamps[msg.sender] = 0;
+        _balances[account] = 0;
+        _unlockTimestamps[account] = 0;
 
-        IERC20(ASSET).safeTransfer(msg.sender, amount);
+        IERC20(ASSET).safeTransfer(destination, amount);
 
-        emit Withdrawn(msg.sender, amount);
+        emit Withdrawn(account, amount);
     }
 }
