@@ -102,65 +102,49 @@ forge test
 forge fmt
 ```
 
+## Deployed Addresses
+
+### Sepolia
+
+| Contract | Address |
+|---|---|
+| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` |
+| Faucet | `0x914abaDC0e36e03f29e4F1516951125c774dBAc8` |
+
 ## Deployment
 
-The deployment script deploys all contracts and wires them together in a single transaction.
+Deployment is split into separate scripts, each with its own bash wrapper that loads configuration from `.env`:
+
+| Script | Bash | Purpose |
+|---|---|---|
+| `DeployToken.s.sol` | `deploy-token.sh` | Deploy YellowToken |
+| `DeployFaucet.s.sol` | `deploy-faucet.sh` | Deploy Faucet (testnet only) |
+| `DeployTreasury.s.sol` | — | Deploy Treasury |
+| `DeployRegistry.s.sol` | — | Deploy registries + governance |
 
 ### Configuration
 
-| Environment Variable | Default | Description |
-|---|---|---|
-| `TREASURY_ADDRESS` | **(required)** | Address receiving the initial YELLOW supply |
-| `FOUNDATION_ADDRESS` | **(required)** | Address that owns the Treasury directly |
-| `ADJUDICATOR_ADDRESS` | **(required)** | Address authorised to slash in AppRegistry |
-| `VOTING_DELAY` | `7200` (~1 day) | Blocks before voting starts after proposal |
-| `VOTING_PERIOD` | `50400` (~1 week) | Blocks the voting window stays open |
-| `PROPOSAL_THRESHOLD` | `10000000000000000000000000` (10M YELLOW) | Minimum voting power to create a proposal |
-| `QUORUM_NUMERATOR` | `4` | Quorum as percentage of total locked supply |
-| `QUORUM_FLOOR` | `100000000000000000000000000` (100M YELLOW) | Minimum absolute quorum in tokens |
-| `NODE_UNLOCK_PERIOD` | `1209600` (14 days) | NodeRegistry withdrawal waiting period in seconds |
-| `APP_UNLOCK_PERIOD` | `1209600` (14 days) | AppRegistry withdrawal waiting period in seconds |
-| `TIMELOCK_DELAY` | `172800` (2 days) | Seconds before a passed proposal can execute |
-
-Block estimates assume 12-second block times (Ethereum mainnet).
-
-### Local (Anvil)
-
-Start a local node:
-
 ```bash
-anvil
+cp .env.example .env
+# Fill in values, then run the scripts
 ```
 
-In a second terminal, deploy:
+See `.env.example` for all available variables.
+
+### Sepolia
 
 ```bash
-TREASURY_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-FOUNDATION_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-ADJUDICATOR_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8 \
-  forge script script/Deploy.s.sol \
-  --rpc-url http://127.0.0.1:8545 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast
+./script/deploy-token.sh
+./script/deploy-faucet.sh
 ```
-
-The private key above is Anvil's default account #0. Replace addresses with whichever Anvil accounts should receive the token supply, own the treasury, and serve as adjudicator.
 
 ### Mainnet
 
-```bash
-TREASURY_ADDRESS=<multisig-or-dao-address> \
-FOUNDATION_ADDRESS=<foundation-multisig> \
-ADJUDICATOR_ADDRESS=<adjudicator-address> \
-  forge script script/Deploy.s.sol \
-  --rpc-url $ETH_RPC_URL \
-  --ledger \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $ETHERSCAN_API_KEY
-```
+Set `NETWORK="mainnet"` in `.env`, then:
 
-Replace `--ledger` with `--private-key` or `--trezor` depending on your signer. Add `--slow` if the RPC rate-limits.
+```bash
+./script/deploy-token.sh
+```
 
 ## License
 
