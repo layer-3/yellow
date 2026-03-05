@@ -1,5 +1,5 @@
 # ILock
-[Git Source](https://github.com/layer-3/yellow/blob/71449e6fbf88339c4ad33ead7237e27ce092d767/src/interfaces/ILock.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/interfaces/ILock.sol)
 
 **Title:**
 ILock
@@ -76,7 +76,7 @@ function unlock() external;
 ### relock
 
 Cancels an in-progress unlock and returns to Locked state.
-Restores voting power. Reverts with NotUnlocking if not unlocking.
+Restores collateral weight. Reverts with NotUnlocking if not unlocking.
 
 
 ```solidity

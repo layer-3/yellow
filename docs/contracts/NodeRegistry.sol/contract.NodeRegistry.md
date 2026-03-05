@@ -1,5 +1,5 @@
 # NodeRegistry
-[Git Source](https://github.com/layer-3/yellow/blob/71449e6fbf88339c4ad33ead7237e27ce092d767/src/NodeRegistry.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/NodeRegistry.sol)
 
 **Inherits:**
 [Locker](/src/Locker.sol/abstract.Locker.md), Votes
@@ -7,12 +7,13 @@
 **Title:**
 NodeRegistry
 
-Node operator registry with governance voting. Operators lock YELLOW
-tokens to register and gain voting power in the Yellow Network DAO.
-Extends OZ Votes to act as the voting-power source for governance.
-Auto-self-delegates on first lock so voting power is immediately active.
+Node operator registry. Operators post YELLOW tokens as a mandatory
+functional security deposit to operate clearnode infrastructure.
+Extends OZ Votes to provide collateral-weight accounting for
+protocol parameter administration by active node operators.
+Auto-self-delegates on first lock so collateral weight is immediately active.
 
-Voting units are granted on lock and removed on unlock/relock via hooks.
+Collateral weight units are granted on lock and removed on unlock/relock via hooks.
 
 
 ## Functions
@@ -46,7 +47,7 @@ function _afterRelock(address account, uint256 balance) internal override;
 
 ### _getVotingUnits
 
-Returns the locked balance as voting units for the Votes system.
+Returns the locked collateral as weight units for the OZ Votes system.
 
 
 ```solidity

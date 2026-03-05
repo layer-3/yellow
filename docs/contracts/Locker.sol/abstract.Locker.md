@@ -1,5 +1,5 @@
 # Locker
-[Git Source](https://github.com/layer-3/yellow/blob/71449e6fbf88339c4ad33ead7237e27ce092d767/src/Locker.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/Locker.sol)
 
 **Inherits:**
 [ILock](/src/interfaces/ILock.sol/interface.ILock.md), ReentrancyGuard
@@ -8,7 +8,7 @@
 Locker
 
 Abstract single-asset vault with a time-locked withdrawal mechanism.
-Subcontracts define the unlock period and may add governance or slashing logic.
+Subcontracts define the unlock period and may add parameter administration or slashing logic.
 
 ASSET is immutably set to YellowToken, a standard ERC-20 with a fixed supply
 and no mint, burn, fee-on-transfer, or rebasing mechanics.
@@ -116,7 +116,7 @@ function unlock() external;
 ### relock
 
 Cancels an in-progress unlock and returns to Locked state.
-Restores voting power. Reverts with NotUnlocking if not unlocking.
+Restores collateral weight. Reverts with NotUnlocking if not unlocking.
 
 
 ```solidity
@@ -136,7 +136,7 @@ function withdraw(address destination) external nonReentrant;
 
 ### _afterLock
 
-Hook called after tokens are locked. Override to add custom logic (e.g. voting power).
+Hook called after tokens are locked. Override to add custom logic (e.g. collateral weight).
 
 
 ```solidity

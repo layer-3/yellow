@@ -1,5 +1,5 @@
 # YellowGovernor
-[Git Source](https://github.com/layer-3/yellow/blob/71449e6fbf88339c4ad33ead7237e27ce092d767/src/Governor.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/Governor.sol)
 
 **Inherits:**
 Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl, GovernorPreventLateQuorum, GovernorProposalGuardian
@@ -7,15 +7,16 @@ Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotes
 **Title:**
 YellowGovernor
 
-On-chain governance for the Yellow Network DAO.
-Voting power is derived from YELLOW tokens locked in the NodeRegistry.
+Protocol parameter administration for the Yellow Network.
+Collateral weight is derived from YELLOW tokens posted as security
+deposits in the NodeRegistry by active node operators.
 Proposals are queued through a TimelockController before execution.
 Enforces a minimum quorum floor so quorum never drops below a
-meaningful absolute value even if total locked supply shrinks.
-Includes late-quorum protection to prevent last-minute whale votes
-from deciding outcomes without giving others time to react.
+meaningful absolute value even if total locked collateral shrinks.
+Includes late-quorum protection to prevent last-minute manipulation
+of outcomes without giving other operators time to react.
 A proposal guardian (Foundation multisig) can cancel any proposal
-as an emergency brake; removable via governance.
+as an emergency brake; removable via parameter administration.
 
 
 ## State Variables
@@ -70,9 +71,9 @@ function quorumFloor(uint256 timepoint) public view returns (uint256);
 
 ### setQuorumFloor
 
-Update the quorum floor. Only callable via governance.
+Update the quorum floor. Only callable via parameter administration.
 
-Reverts if newFloor exceeds the current total voting supply.
+Reverts if newFloor exceeds the current total collateral weight supply.
 
 
 ```solidity
