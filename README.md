@@ -104,6 +104,12 @@ forge fmt
 
 ## Deployed Addresses
 
+### Mainnet
+
+| Contract | Address |
+|---|---|
+| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` |
+
 ### Sepolia
 
 | Contract | Address |
