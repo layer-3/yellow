@@ -90,6 +90,7 @@ sdk-build:
 
 sdk-extract:
 	bun run script/extract-abis.ts
+	bun run script/extract-addresses.ts
 
 # Docs
 docs:
@@ -101,15 +102,21 @@ release:
 	@echo "==> Running checks..."
 	forge fmt --check
 	forge test -vvv
+	@echo "==> Updating sdk/package.json version to $(v)..."
+	cd sdk && npm version "$(v)" --no-git-tag-version
 	@echo "==> Building SDK..."
 	$(MAKE) sdk-build
 	@echo "==> Building docs..."
 	$(MAKE) docs
+	@echo "==> Committing generated files..."
+	git add docs/ sdk/package.json
+	git diff --cached --quiet || git commit -m "chore: regenerate docs and SDK for v$(v)"
 	@echo "==> Tagging v$(v)..."
 	git tag -a "v$(v)" -m "Release v$(v)"
 	@echo ""
 	@echo "Release v$(v) tagged. To publish:"
-	@echo "  git push origin v$(v)"
+	@echo "  git push origin master --tags"
+	@echo "  cd sdk && npm publish"
 
 # Dependencies
 install:

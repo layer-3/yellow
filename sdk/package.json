@@ -1,6 +1,6 @@
 {
   "name": "@yellow-org/contracts",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -17,11 +17,22 @@
       }
     }
   },
+  "description": "Typed ABIs and deployed addresses for Yellow Network smart contracts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/layer-3/yellow",
+    "directory": "sdk"
+  },
+  "license": "GPL-3.0-or-later",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
-    "extract": "bun run ../script/extract-abis.ts",
+    "extract": "bun run ../script/extract-abis.ts && bun run ../script/extract-addresses.ts",
     "build": "bun run extract && tsup",
     "prepublishOnly": "bun run build"
   },

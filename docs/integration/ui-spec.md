@@ -18,19 +18,19 @@ Frontend implementation guide for the Yellow Network dApp. All contracts use Sol
 
 **Approval flow:** Before any `lock()`, check `allowance()` and prompt `approve()` (or `permit()` for gasless UX).
 
-### 2. Staking
+### 2. Collateral
 
-Both registries share the same ILock state machine. Use a toggle or tabs for Node / App.
+Both registries share the same ILock state machine. Use a toggle or tabs for Node Operator / App Builder.
 
 **Idle state:**
-- Lock form: amount input + "Lock" button
+- Lock form: amount input + "Post Collateral" button
 - Prompt token approval if needed
 
 **Locked state:**
-- Show locked balance
+- Show locked balance (security deposit amount)
 - "Top Up" button (calls `lock()` again)
 - "Unlock" button (starts countdown)
-- NodeRegistry: show voting power and delegation
+- NodeRegistry: show collateral weight and delegation
 
 **Unlocking state:**
 - Locked balance + countdown timer (`unlockTimestamp - now`)
@@ -40,25 +40,25 @@ Both registries share the same ILock state machine. Use a toggle or tabs for Nod
 
 **NodeRegistry-specific:**
 - Show "Delegated to: {address}" with option to change
-- Warning before `unlock()`: "This will remove your voting power"
-- Display current voting power
+- Warning before `unlock()`: "This will remove your collateral weight from parameter administration"
+- Display current collateral weight
 
-### 3. Governance
+### 3. Protocol Parameter Administration
 
 **Proposal list:**
 - Fetch via `ProposalCreated` events
 - Show state badge (Pending/Active/Succeeded/Queued/Executed/Defeated/Canceled)
-- For Active proposals: vote tallies with progress bars, quorum progress
+- For Active proposals: support tallies with progress bars, quorum progress
 
 **Create proposal:**
-- Pre-check: user's voting power >= proposalThreshold
+- Pre-check: user's collateral weight >= proposalThreshold
 - Template selector for common actions (treasury transfer, role grant, etc.)
 - Custom action builder: target, function, params, value
 
 **Proposal detail:**
-- State-dependent action buttons: Vote (Active), Queue (Succeeded), Execute (Queued)
-- Vote buttons: For / Against / Abstain
-- Show "Already voted" if `hasVoted() == true`
+- State-dependent action buttons: Signal Support (Active), Queue (Succeeded), Execute (Queued)
+- Support buttons: For / Against / Abstain
+- Show "Already signalled" if `hasVoted() == true`
 - Timelock countdown when Queued
 
 ### 4. Treasury (admin)
@@ -81,11 +81,11 @@ Both registries share the same ILock state machine. Use a toggle or tabs for Nod
 | Lock state | NodeRegistry/AppRegistry | `lockStateOf(address)` |
 | Locked amount | NodeRegistry/AppRegistry | `balanceOf(address)` |
 | Unlock countdown | NodeRegistry/AppRegistry | `unlockTimestampOf(address)` |
-| Voting power | NodeRegistry | `getVotes(address)` |
+| Collateral weight | NodeRegistry | `getVotes(address)` |
 | Delegate | NodeRegistry | `delegates(address)` |
 | Proposal state | YellowGovernor | `state(proposalId)` |
-| Vote tallies | YellowGovernor | `proposalVotes(proposalId)` |
+| Support tallies | YellowGovernor | `proposalVotes(proposalId)` |
 | Quorum needed | YellowGovernor | `quorum(blockNumber)` |
-| Has voted | YellowGovernor | `hasVoted(proposalId, address)` |
+| Has signalled | YellowGovernor | `hasVoted(proposalId, address)` |
 | Treasury owner | Treasury | `owner()` |
 | Slash cooldown | AppRegistry | `slashCooldown()`, `lastSlashTimestamp()` |

@@ -1,5 +1,5 @@
 # AppRegistry
-[Git Source](https://github.com/layer-3/yellow/blob/b67bbac4d4ae41afab3ea9edfcd53990dc2741dd/src/AppRegistry.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/71449e6fbf88339c4ad33ead7237e27ce092d767/src/AppRegistry.sol)
 
 **Inherits:**
 [Locker](/src/Locker.sol/abstract.Locker.md), [ISlash](/src/interfaces/ISlash.sol/interface.ISlash.md), AccessControl

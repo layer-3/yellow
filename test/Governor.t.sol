@@ -10,7 +10,6 @@ import {NodeRegistry} from "../src/NodeRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 import {YellowGovernor} from "../src/Governor.sol";
 import {Treasury} from "../src/Treasury.sol";
-import {ILock} from "../src/interfaces/ILock.sol";
 
 /// @dev Test harness that exposes internal quorum floor update for testing.
 contract YellowGovernorHarness is YellowGovernor {
@@ -113,7 +112,7 @@ contract YellowGovernorTest is Test {
 
         vm.stopPrank();
 
-        // Alice & bob approve and lock tokens, delegate to self
+        // Alice & bob approve and post collateral, delegate weight to self
         vm.startPrank(alice);
         token.approve(address(locker), type(uint256).max);
         locker.lock(alice, LOCK_AMOUNT);
@@ -126,7 +125,7 @@ contract YellowGovernorTest is Test {
         locker.delegate(bob);
         vm.stopPrank();
 
-        // Advance one block so voting power checkpoints are available
+        // Advance one block so collateral weight checkpoints are available
         vm.roll(block.number + 1);
     }
 
@@ -272,7 +271,7 @@ contract YellowGovernorTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Treasury is Foundation-owned (not governance-controlled)
+    // Treasury is Foundation-owned (not parameter-administration-controlled)
     // -------------------------------------------------------------------------
 
     function test_treasury_foundationCanTransfer() public {
@@ -298,7 +297,7 @@ contract YellowGovernorTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Unlock removes voting power from governance
+    // Unlock removes collateral weight from parameter administration
     // -------------------------------------------------------------------------
 
     function test_unlock_beforeProposal_zeroVotingPower() public {
@@ -311,7 +310,7 @@ contract YellowGovernorTest is Test {
         uint256 proposalId = _createProposal();
         vm.roll(block.number + VOTING_DELAY + 1);
 
-        // Alice votes, but her power at the snapshot block is 0
+        // Alice signals support, but her weight at the snapshot block is 0
         vm.prank(alice);
         governor.castVote(proposalId, 1);
 
@@ -321,14 +320,14 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + VOTING_PERIOD + 1);
 
-        // Quorum is 4% of total supply at snapshot.
-        // Total supply at snapshot = only bob's LOCK_AMOUNT (alice's was removed).
-        // Bob's vote = LOCK_AMOUNT which is 100% of supply → passes quorum.
+        // Quorum is 4% of total collateral at snapshot.
+        // Total collateral at snapshot = only bob's LOCK_AMOUNT (alice's was removed).
+        // Bob's weight = LOCK_AMOUNT which is 100% of collateral → passes quorum.
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
 
-        // Verify alice had 0 weight
+        // Verify alice had 0 collateral weight
         (uint256 againstVotes, uint256 forVotes,) = governor.proposalVotes(proposalId);
-        assertEq(forVotes, LOCK_AMOUNT); // only bob's weight
+        assertEq(forVotes, LOCK_AMOUNT); // only bob's collateral weight
         assertEq(againstVotes, 0);
     }
 
@@ -343,7 +342,7 @@ contract YellowGovernorTest is Test {
         vm.prank(alice);
         locker.unlock();
 
-        // Alice votes — her power at the snapshot block is still LOCK_AMOUNT
+        // Alice signals support — her weight at the snapshot block is still LOCK_AMOUNT
         vm.prank(alice);
         governor.castVote(proposalId, 1);
 
@@ -367,7 +366,7 @@ contract YellowGovernorTest is Test {
         uint256 proposalId = _createProposal();
         vm.roll(block.number + VOTING_DELAY + 1);
 
-        // Both vote for but with zero weight
+        // Both signal support but with zero weight
         vm.prank(alice);
         governor.castVote(proposalId, 1);
         vm.prank(bob);
@@ -385,7 +384,7 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + VOTING_DELAY + 1);
 
-        // Alice unlocks and then votes — snapshot predates unlock so she keeps power
+        // Alice unlocks and then signals — snapshot predates unlock so she keeps weight
         vm.prank(alice);
         locker.unlock();
 
@@ -415,10 +414,10 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + 1);
 
-        // Alice's voting power is restored
+        // Alice's collateral weight is restored
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
 
-        // Create proposal — alice has power at the snapshot
+        // Create proposal — alice has collateral weight at the snapshot
         uint256 proposalId = _createProposal();
         vm.roll(block.number + VOTING_DELAY + 1);
 
@@ -436,18 +435,18 @@ contract YellowGovernorTest is Test {
     }
 
     function test_unlock_reducesTotalSupplyAtSnapshot() public {
-        // Alice unlocks — removes her voting units from total supply
+        // Alice unlocks — removes her collateral weight from total supply
         vm.prank(alice);
         locker.unlock();
 
         vm.roll(block.number + 2);
 
-        // Total supply at the block after unlock should only include bob
+        // Total collateral at the block after unlock should only include bob
         assertEq(locker.getPastTotalSupply(block.number - 1), LOCK_AMOUNT);
     }
 
     function test_unlock_fullGovernanceCycleWithUnlockedVoter() public {
-        // Alice unlocks after proposal is created, full cycle still works
+        // Alice unlocks after proposal is created, full parameter administration cycle still works
         (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
             _dummyProposal();
 
@@ -488,7 +487,7 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + 1);
 
-        // Bob should NOT gain alice's voting units — _getVotingUnits returns 0 for unlocking accounts
+        // Bob should NOT gain alice's collateral weight — _getVotingUnits returns 0 for unlocking accounts
         // Bob keeps only his own LOCK_AMOUNT
         assertEq(locker.getVotes(bob), LOCK_AMOUNT);
     }
@@ -645,7 +644,7 @@ contract YellowGovernorTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Relock — governance-specific (lock state tests are in Locker.t.sol)
+    // Relock — parameter administration specific (lock state tests are in Locker.t.sol)
     // -------------------------------------------------------------------------
 
     function test_relock_restoresVotingPower() public {
@@ -698,13 +697,13 @@ contract YellowGovernorTest is Test {
         vm.prank(alice);
         locker.unlock();
 
-        // Alice sees a proposal coming and relocks
+        // Alice sees a parameter change proposal coming and relocks
         vm.prank(alice);
         locker.relock();
 
         vm.roll(block.number + 1);
 
-        // Create proposal — alice has voting power at snapshot
+        // Create proposal — alice has collateral weight at snapshot
         uint256 proposalId = _createProposal();
         vm.roll(block.number + VOTING_DELAY + 1);
 

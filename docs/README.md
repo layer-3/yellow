@@ -2,10 +2,13 @@
 
 ## Table of Contents
 
+### Introduction
+- [What Is Yellow Network?](./what-is-yellow.md) — Plain-language guide for the general public
+
 ### Protocol
 - [Overview](./protocol/overview.md) — Architecture, contracts, and how they fit together
-- [Governance](./protocol/governance.md) — Voting power, proposals, and the DAO lifecycle
-- [Staking](./protocol/staking.md) — Lock/unlock state machine for NodeRegistry and AppRegistry
+- [Protocol Parameter Administration](./protocol/governance.md) — On-chain parameter updates by active node operators
+- [Collateral](./protocol/staking.md) — Lock/unlock state machine for NodeRegistry and AppRegistry
 - [Slashing](./protocol/slashing.md) — Adjudicator slashing and cooldown mechanism
 - [Treasury](./protocol/treasury.md) — Foundation asset management
 

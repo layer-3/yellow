@@ -1,6 +1,8 @@
 # Treasury
 
-The Treasury is a secure vault for Layer-3 Foundation assets. It supports ETH and ERC-20 transfers and is protected by `Ownable2Step` to prevent accidental ownership loss.
+The Treasury is a secure vault for Layer3 Foundation assets. It supports ETH and ERC-20 transfers and is protected by `Ownable2Step` to prevent accidental ownership loss.
+
+The Foundation Treasury is funded by fees from Yellow App Store subscriptions and premium application-layer features, and is used to fund continued research, development, and delivery of the goods and services accessible through YELLOW. Protocol fees from clearing and trading operations are separate and are locked into node operators' collateral (see [Collateral](./staking.md)).
 
 ## Transfer Function
 
@@ -31,10 +33,10 @@ This two-step process prevents accidentally transferring ownership to an incorre
 - The Foundation multisig is the owner
 - Can call `transfer()` directly
 
-**Governance-owned (via TimelockController):**
+**Parameter-administration-owned (via TimelockController):**
 - The TimelockController is the owner
-- Transfers require a governance proposal: propose → vote → queue → execute
-- Provides full DAO control over treasury funds
+- Transfers require a parameter administration proposal: propose, reach operator consensus, queue, execute
+- Provides oversight by active node operators over treasury funds
 
 ## Receiving Funds
 

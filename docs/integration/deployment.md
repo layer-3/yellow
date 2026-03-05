@@ -100,11 +100,17 @@ No manual role setup is needed.
 
 ## Updating the SDK
 
-After deploying new contracts, update `sdk/src/addresses.ts` with the new addresses and publish a new SDK version:
+After deploying new contracts, addresses are extracted automatically from the Forge broadcast artifacts:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+make sdk-build   # extracts ABIs + addresses, builds SDK
+make docs        # regenerates docs (including addresses page)
 ```
 
-The CI pipeline will build and publish automatically.
+Then publish a new SDK version:
+
+```bash
+make release v=1.1.0
+git push origin master --tags
+cd sdk && npm publish
+```

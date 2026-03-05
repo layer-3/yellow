@@ -10,16 +10,16 @@ import {ISlash} from "./interfaces/ISlash.sol";
 
 /**
  * @title AppRegistry
- * @notice Registry for Clearnet users and app owners who lock collateral. Authorised adjudicators
- *         can slash a participant's balance as penalty for misbehaviour.
+ * @notice Registry for app builders who post YELLOW as a service quality guarantee.
+ *         Authorised adjudicators can slash a participant's balance as penalty for misbehaviour.
  *
  * @dev Access control:
- *      - `DEFAULT_ADMIN_ROLE` is held by governance (TimelockController) and
+ *      - `DEFAULT_ADMIN_ROLE` is held by the TimelockController (parameter administration) and
  *        can grant or revoke `ADJUDICATOR_ROLE` to multiple addresses.
  *      - `ADJUDICATOR_ROLE` holders can call `slash`.
  *
- *      No governance voting power — this registry is purely for collateral
- *      management and slashing. See NodeRegistry for the governance-enabled
+ *      No collateral weight for parameter administration — this registry is purely for
+ *      collateral management and slashing. See NodeRegistry for the parameter-administration-enabled
  *      variant used by node operators.
  *
  *      Slashing can occur in both Locked and Unlocking states.

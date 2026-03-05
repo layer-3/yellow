@@ -1,6 +1,6 @@
 # Slashing
 
-The AppRegistry allows authorized adjudicators to slash misbehaving users' locked collateral. Slashing transfers tokens from the user's balance to a specified recipient.
+The AppRegistry allows authorized adjudicators to slash misbehaving app builders' locked collateral. Slashing transfers tokens from the user's balance to a specified recipient. This mechanism enforces service quality guarantees for applications registered on the Yellow Network.
 
 ## How It Works
 
@@ -49,18 +49,18 @@ Without cooldown, a rogue adjudicator can:
 slash(userA, ...) + slash(userB, ...) + slash(userC, ...)  // all in one tx
 ```
 
-This drains every user before the admin can call `revokeRole`.
+This drains every user before the admin can revoke the role.
 
-With cooldown (e.g. 1 hour), only one slash per hour is possible, giving governance time to revoke the rogue adjudicator.
+With cooldown (e.g. 1 hour), only one slash per hour is possible, giving active node operators time to revoke the rogue adjudicator through parameter administration.
 
 ## Role Management
 
 | Role | Held By | Purpose |
 |---|---|---|
-| `DEFAULT_ADMIN_ROLE` | TimelockController (governance) | Grant/revoke adjudicators, set cooldown |
+| `DEFAULT_ADMIN_ROLE` | TimelockController (parameter administration) | Grant/revoke adjudicators, set cooldown |
 | `ADJUDICATOR_ROLE` | Authorized adjudicator(s) | Call `slash()` |
 
-Roles are managed via governance proposals that execute through the TimelockController:
+Roles are managed via parameter administration proposals that execute through the TimelockController:
 
 - **Grant:** `appRegistry.grantRole(ADJUDICATOR_ROLE, newAdjudicator)`
 - **Revoke:** `appRegistry.revokeRole(ADJUDICATOR_ROLE, rogueAdjudicator)`

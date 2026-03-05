@@ -104,7 +104,7 @@ interface ILock {
     function unlock() external;
 
     /// @notice Cancels an in-progress unlock and returns to Locked state.
-    ///         Restores voting power. Reverts with NotUnlocking if not unlocking.
+    ///         Restores collateral weight. Reverts with NotUnlocking if not unlocking.
     function relock() external;
 
     /// @notice Transfers the caller's full balance to `destination`.

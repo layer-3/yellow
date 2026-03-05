@@ -10,7 +10,7 @@ import {ILock} from "./interfaces/ILock.sol";
 /**
  * @title Locker
  * @notice Abstract single-asset vault with a time-locked withdrawal mechanism.
- *         Subcontracts define the unlock period and may add governance or slashing logic.
+ *         Subcontracts define the unlock period and may add parameter administration or slashing logic.
  *
  * @dev ASSET is immutably set to YellowToken, a standard ERC-20 with a fixed supply
  *      and no mint, burn, fee-on-transfer, or rebasing mechanics.
@@ -120,7 +120,7 @@ abstract contract Locker is ILock, ReentrancyGuard {
         emit Withdrawn(account, amount);
     }
 
-    /// @dev Hook called after tokens are locked. Override to add custom logic (e.g. voting power).
+    /// @dev Hook called after tokens are locked. Override to add custom logic (e.g. collateral weight).
     function _afterLock(address target, uint256 amount) internal virtual {}
 
     /// @dev Hook called after unlock is initiated. Override to add custom logic.

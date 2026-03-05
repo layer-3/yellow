@@ -97,7 +97,7 @@ contract NodeRegistryTest is Test {
         nodeRegistry.lock(alice, LOCK_AMOUNT);
 
         vm.roll(block.number + 1);
-        // Auto-self-delegation means votes are immediately active
+        // Auto-self-delegation means collateral weight is immediately active
         assertEq(nodeRegistry.getVotes(alice), LOCK_AMOUNT);
         assertEq(nodeRegistry.delegates(alice), alice);
     }
@@ -131,7 +131,7 @@ contract NodeRegistryTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Voting units on lock
+    // Collateral weight on lock
     // -------------------------------------------------------------------------
 
     function test_lock_updatesVotingPower() public {
@@ -154,7 +154,7 @@ contract NodeRegistryTest is Test {
     }
 
     // -------------------------------------------------------------------------
-    // Voting power on unlock vs withdraw
+    // Collateral weight on unlock vs withdraw
     // -------------------------------------------------------------------------
 
     function test_unlock_removesVotingPower() public {

@@ -18,15 +18,16 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title YellowGovernor
- * @notice On-chain governance for the Yellow Network DAO.
- *         Voting power is derived from YELLOW tokens locked in the NodeRegistry.
+ * @notice Protocol parameter administration for the Yellow Network.
+ *         Collateral weight is derived from YELLOW tokens posted as security
+ *         deposits in the NodeRegistry by active node operators.
  *         Proposals are queued through a TimelockController before execution.
  *         Enforces a minimum quorum floor so quorum never drops below a
- *         meaningful absolute value even if total locked supply shrinks.
- *         Includes late-quorum protection to prevent last-minute whale votes
- *         from deciding outcomes without giving others time to react.
+ *         meaningful absolute value even if total locked collateral shrinks.
+ *         Includes late-quorum protection to prevent last-minute manipulation
+ *         of outcomes without giving other operators time to react.
  *         A proposal guardian (Foundation multisig) can cancel any proposal
- *         as an emergency brake; removable via governance.
+ *         as an emergency brake; removable via parameter administration.
  */
 contract YellowGovernor is
     Governor,
@@ -79,8 +80,8 @@ contract YellowGovernor is
         return key <= timepoint ? value : _quorumFloorHistory.upperLookupRecent(SafeCast.toUint48(timepoint));
     }
 
-    /// @notice Update the quorum floor. Only callable via governance.
-    /// @dev Reverts if newFloor exceeds the current total voting supply.
+    /// @notice Update the quorum floor. Only callable via parameter administration.
+    /// @dev Reverts if newFloor exceeds the current total collateral weight supply.
     function setQuorumFloor(uint256 newFloor) public onlyGovernance {
         uint256 supply = token().getPastTotalSupply(clock() - 1);
         if (newFloor > supply) revert QuorumFloorExceedsTotalSupply(newFloor, supply);

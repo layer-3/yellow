@@ -32,7 +32,7 @@ const client = createPublicClient({
   transport: http(),
 });
 
-// Read a user's locked balance — fully typed
+// Read a node operator's locked collateral — fully typed
 const balance = await client.readContract({
   address: addresses[1].nodeRegistry!,
   abi: NodeRegistryAbi,
@@ -64,7 +64,7 @@ const balance = await nodeRegistry.balanceOf("0x...");
 import { useReadContract } from "wagmi";
 import { NodeRegistryAbi, addresses } from "@yellow-org/contracts";
 
-function LockedBalance({ user }: { user: `0x${string}` }) {
+function LockedCollateral({ user }: { user: `0x${string}` }) {
   const { data: balance } = useReadContract({
     address: addresses[1].nodeRegistry!,
     abi: NodeRegistryAbi,

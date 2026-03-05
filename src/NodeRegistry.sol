@@ -11,22 +11,23 @@ string constant VERSION = "1.0.0";
 
 /**
  * @title NodeRegistry
- * @notice Node operator registry with governance voting. Operators lock YELLOW
- *         tokens to register and gain voting power in the Yellow Network DAO.
- *         Extends OZ Votes to act as the voting-power source for governance.
- *         Auto-self-delegates on first lock so voting power is immediately active.
+ * @notice Node operator registry. Operators post YELLOW tokens as a mandatory
+ *         functional security deposit to operate clearnode infrastructure.
+ *         Extends OZ Votes to provide collateral-weight accounting for
+ *         protocol parameter administration by active node operators.
+ *         Auto-self-delegates on first lock so collateral weight is immediately active.
  *
- * @dev Voting units are granted on lock and removed on unlock/relock via hooks.
+ * @dev Collateral weight units are granted on lock and removed on unlock/relock via hooks.
  */
 contract NodeRegistry is Locker, Votes {
     constructor(address asset_, uint256 unlockPeriod_) Locker(asset_, unlockPeriod_) EIP712(NAME, VERSION) {}
 
     function _afterLock(address target, uint256 amount) internal override {
-        // Transfer voting units first — when delegate is address(0) the vote
-        // movement is a no-op, but total supply checkpoints are updated.
+        // Transfer collateral weight units first — when delegate is address(0)
+        // the weight movement is a no-op, but total supply checkpoints are updated.
         _transferVotingUnits(address(0), target, amount);
-        // Auto-self-delegate on first lock so undelegated locks don't inflate
-        // quorum without producing votable power.
+        // Auto-self-delegate on first lock so undelegated deposits don't inflate
+        // quorum without producing usable collateral weight.
         if (delegates(target) == address(0)) {
             _delegate(target, target);
         }
@@ -40,7 +41,7 @@ contract NodeRegistry is Locker, Votes {
         _transferVotingUnits(address(0), account, balance);
     }
 
-    /// @dev Returns the locked balance as voting units for the Votes system.
+    /// @dev Returns the locked collateral as weight units for the OZ Votes system.
     function _getVotingUnits(address account) internal view override returns (uint256) {
         if (_unlockTimestamps[account] != 0) return 0;
         return _balances[account];

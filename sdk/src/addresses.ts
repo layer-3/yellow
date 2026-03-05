@@ -11,14 +11,14 @@ export type ContractAddresses = {
 /**
  * Deployed contract addresses keyed by chain ID.
  *
- * Update these after each deployment.
+ * Auto-generated from Forge broadcast artifacts — do not edit manually.
  */
 export const addresses: Record<number, Partial<ContractAddresses>> = {
   // Ethereum Mainnet
   1: {
     yellowToken: "0x236eB848C95b231299B4AA9f56c73D6893462720",
   },
-  // Sepolia
+  // Sepolia Testnet
   11155111: {
     yellowToken: "0x236eB848C95b231299B4AA9f56c73D6893462720",
     faucet: "0x914abaDC0e36e03f29e4F1516951125c774dBAc8",

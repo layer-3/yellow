@@ -48,7 +48,7 @@ const balance = await publicClient.readContract({
   args: [walletClient.account.address],
 });
 
-// Approve NodeRegistry to spend tokens
+// Approve NodeRegistry to spend tokens for collateral deposit
 await walletClient.writeContract({
   address: addr.yellowToken!,
   abi: YellowTokenAbi,
@@ -59,11 +59,12 @@ await walletClient.writeContract({
 
 ---
 
-## Staking (NodeRegistry)
+## Node Operator Collateral (NodeRegistry)
 
-### Lock tokens
+### Post security deposit
 
 ```ts
+// Post YELLOW as a mandatory functional security deposit to operate a clearnode
 await walletClient.writeContract({
   address: addr.nodeRegistry!,
   abi: NodeRegistryAbi,
@@ -124,9 +125,10 @@ await walletClient.writeContract({
 });
 ```
 
-### Delegate voting power
+### Delegate collateral weight
 
 ```ts
+// Delegate collateral weight for protocol parameter administration
 await walletClient.writeContract({
   address: addr.nodeRegistry!,
   abi: NodeRegistryAbi,
@@ -134,8 +136,8 @@ await walletClient.writeContract({
   args: [delegateeAddress],
 });
 
-// Check voting power
-const votes = await publicClient.readContract({
+// Check collateral weight
+const weight = await publicClient.readContract({
   address: addr.nodeRegistry!,
   abi: NodeRegistryAbi,
   functionName: "getVotes",
@@ -145,14 +147,14 @@ const votes = await publicClient.readContract({
 
 ---
 
-## Governance
+## Protocol Parameter Administration
 
 ### Create a proposal
 
 ```ts
 import { encodeFunctionData, keccak256, toBytes } from "viem";
 
-// Example: transfer 1000 YELLOW from Treasury to a recipient
+// Example: transfer 1000 YELLOW from Treasury to a grants recipient
 const calldata = encodeFunctionData({
   abi: TreasuryAbi,
   functionName: "transfer",
@@ -174,7 +176,7 @@ await walletClient.writeContract({
 });
 ```
 
-### Vote on a proposal
+### Signal support on a proposal
 
 ```ts
 // support: 0 = Against, 1 = For, 2 = Abstain
@@ -182,7 +184,7 @@ await walletClient.writeContract({
   address: addr.governor!,
   abi: YellowGovernorAbi,
   functionName: "castVote",
-  args: [proposalId, 1], // Vote For
+  args: [proposalId, 1], // For
 });
 
 // With reason
@@ -190,7 +192,7 @@ await walletClient.writeContract({
   address: addr.governor!,
   abi: YellowGovernorAbi,
   functionName: "castVoteWithReason",
-  args: [proposalId, 1, "Strong alignment with roadmap"],
+  args: [proposalId, 1, "Necessary parameter update for network scaling"],
 });
 ```
 
@@ -199,7 +201,7 @@ await walletClient.writeContract({
 ```ts
 const descriptionHash = keccak256(toBytes(description));
 
-// Queue (after vote succeeds)
+// Queue (after operator consensus is reached)
 await walletClient.writeContract({
   address: addr.governor!,
   abi: YellowGovernorAbi,
@@ -228,7 +230,7 @@ const state = await publicClient.readContract({
 // 0=Pending, 1=Active, 2=Canceled, 3=Defeated,
 // 4=Succeeded, 5=Queued, 6=Expired, 7=Executed
 
-const [againstVotes, forVotes, abstainVotes] = await publicClient.readContract({
+const [againstWeight, forWeight, abstainWeight] = await publicClient.readContract({
   address: addr.governor!,
   abi: YellowGovernorAbi,
   functionName: "proposalVotes",
@@ -241,6 +243,7 @@ const [againstVotes, forVotes, abstainVotes] = await publicClient.readContract({
 ## Slashing (AppRegistry — adjudicator)
 
 ```ts
+// Slash an app builder's service quality guarantee for protocol violation
 await walletClient.writeContract({
   address: addr.appRegistry!,
   abi: AppRegistryAbi,
@@ -259,19 +262,19 @@ await walletClient.writeContract({
 ## Listening to Events
 
 ```ts
-// Watch for new locks on NodeRegistry
+// Watch for new collateral deposits on NodeRegistry
 publicClient.watchContractEvent({
   address: addr.nodeRegistry!,
   abi: NodeRegistryAbi,
   eventName: "Locked",
   onLogs: (logs) => {
     for (const log of logs) {
-      console.log(`${log.args.user} locked ${log.args.deposited}`);
+      console.log(`${log.args.user} posted ${log.args.deposited} collateral`);
     }
   },
 });
 
-// Watch for new proposals
+// Watch for new parameter proposals
 publicClient.watchContractEvent({
   address: addr.governor!,
   abi: YellowGovernorAbi,
