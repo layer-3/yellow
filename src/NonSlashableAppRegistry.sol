@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ILock2} from "./interfaces/ILock2.sol";
+import {ILock} from "./interfaces/ILock.sol";
 
 /**
  * @title NonSlashableAppRegistry
@@ -23,7 +23,7 @@ import {ILock2} from "./interfaces/ILock2.sol";
  *   2. unlock()      — start the countdown.
  *   3. withdraw()    — after the period elapses, receive the full balance.
  */
-contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
+contract NonSlashableAppRegistry is ILock, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public immutable ASSET;
@@ -43,24 +43,24 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
     // ILock view functions
     // -------------------------------------------------------------------------
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function asset() external view returns (address) {
         return ASSET;
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function lockStateOf(address user) external view returns (LockState) {
         if (_balances[user] == 0) return LockState.Idle;
         if (_unlockTimestamps[user] == 0) return LockState.Locked;
         return LockState.Unlocking;
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function balanceOf(address user) external view returns (uint256) {
         return _balances[user];
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function unlockTimestampOf(address user) external view returns (uint256) {
         return _unlockTimestamps[user];
     }
@@ -69,7 +69,7 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
     // ILock mutating functions
     // -------------------------------------------------------------------------
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function lock(address target, uint256 amount) external nonReentrant {
         require(amount != 0, InvalidAmount());
         require(_unlockTimestamps[target] == 0, AlreadyUnlocking());
@@ -84,7 +84,7 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
         emit Locked(target, received, newBalance);
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function unlock() external {
         address account = msg.sender;
         uint256 balance = _balances[account];
@@ -97,7 +97,7 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
         emit UnlockInitiated(account, balance, availableAt);
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function relock() external {
         address account = msg.sender;
         require(_unlockTimestamps[account] != 0, NotUnlocking());
@@ -108,7 +108,7 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
         emit Relocked(account, balance);
     }
 
-    /// @inheritdoc ILock2
+    /// @inheritdoc ILock
     function withdraw(address destination) external nonReentrant {
         address account = msg.sender;
         uint256 unlockTimestamp = _unlockTimestamps[account];

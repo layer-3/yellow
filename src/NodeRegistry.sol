@@ -65,20 +65,20 @@ contract NodeRegistry is ILock, ReentrancyGuard, Votes {
     }
 
     /// @inheritdoc ILock
-    function lock(uint256 amount) external nonReentrant {
+    function lock(address target, uint256 amount) external nonReentrant {
         if (amount == 0) revert InvalidAmount();
-        if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
+        if (_unlockTimestamps[target] != 0) revert AlreadyUnlocking();
 
         uint256 balanceBefore = IERC20(ASSET).balanceOf(address(this));
         IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = IERC20(ASSET).balanceOf(address(this)) - balanceBefore;
 
-        uint256 newBalance = _balances[msg.sender] + received;
-        _balances[msg.sender] = newBalance;
+        uint256 newBalance = _balances[target] + received;
+        _balances[target] = newBalance;
 
-        _transferVotingUnits(address(0), msg.sender, received);
+        _transferVotingUnits(address(0), target, received);
 
-        emit Locked(msg.sender, newBalance);
+        emit Locked(target, received, newBalance);
     }
 
     /// @inheritdoc ILock
@@ -108,7 +108,7 @@ contract NodeRegistry is ILock, ReentrancyGuard, Votes {
     }
 
     /// @inheritdoc ILock
-    function withdraw() external nonReentrant {
+    function withdraw(address destination) external nonReentrant {
         uint256 unlockTimestamp = _unlockTimestamps[msg.sender];
         if (unlockTimestamp == 0) revert NotUnlocking();
         if (block.timestamp < unlockTimestamp) revert UnlockPeriodNotElapsed(unlockTimestamp);
@@ -118,7 +118,7 @@ contract NodeRegistry is ILock, ReentrancyGuard, Votes {
         _balances[msg.sender] = 0;
         _unlockTimestamps[msg.sender] = 0;
 
-        IERC20(ASSET).safeTransfer(msg.sender, amount);
+        IERC20(ASSET).safeTransfer(destination, amount);
 
         emit Withdrawn(msg.sender, amount);
     }

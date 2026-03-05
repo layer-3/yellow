@@ -37,7 +37,7 @@ contract LockerVotesTest is Test {
 
     function test_delegate_selfDelegationActivatesVotes() public {
         vm.startPrank(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.delegate(alice);
         vm.stopPrank();
 
@@ -47,7 +47,7 @@ contract LockerVotesTest is Test {
 
     function test_delegate_noDelegationMeansNoVotes() public {
         vm.prank(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
 
         vm.roll(block.number + 1);
         assertEq(locker.getVotes(alice), 0);
@@ -55,7 +55,7 @@ contract LockerVotesTest is Test {
 
     function test_delegate_toAnotherAddress() public {
         vm.startPrank(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.delegate(bob);
         vm.stopPrank();
 
@@ -66,7 +66,7 @@ contract LockerVotesTest is Test {
 
     function test_delegate_changeDelegateMovesVotes() public {
         vm.startPrank(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.delegate(bob);
         vm.stopPrank();
 
@@ -88,7 +88,7 @@ contract LockerVotesTest is Test {
     function test_lock_updatesVotingPower() public {
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
@@ -97,8 +97,8 @@ contract LockerVotesTest is Test {
     function test_lock_topUp_increasesVotingPower() public {
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         assertEq(locker.getVotes(alice), LOCK_AMOUNT * 2);
@@ -111,7 +111,7 @@ contract LockerVotesTest is Test {
     function test_unlock_removesVotingPower() public {
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.unlock();
         vm.stopPrank();
 
@@ -121,14 +121,14 @@ contract LockerVotesTest is Test {
     function test_withdraw_removesVotingPower() public {
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.unlock();
         vm.stopPrank();
 
         vm.warp(block.timestamp + 14 days);
 
         vm.prank(alice);
-        locker.withdraw();
+        locker.withdraw(alice);
 
         assertEq(locker.getVotes(alice), 0);
     }
@@ -143,7 +143,7 @@ contract LockerVotesTest is Test {
 
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         // After lock: has votes
@@ -165,7 +165,7 @@ contract LockerVotesTest is Test {
 
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         vm.roll(20);
@@ -175,7 +175,7 @@ contract LockerVotesTest is Test {
         // Bob locks
         vm.startPrank(bob);
         locker.delegate(bob);
-        locker.lock(LOCK_AMOUNT * 2);
+        locker.lock(bob, LOCK_AMOUNT * 2);
         vm.stopPrank();
 
         vm.roll(30);
@@ -192,12 +192,12 @@ contract LockerVotesTest is Test {
     function test_multipleUsers_independentVotingPower() public {
         vm.startPrank(alice);
         locker.delegate(alice);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         vm.startPrank(bob);
         locker.delegate(bob);
-        locker.lock(LOCK_AMOUNT * 2);
+        locker.lock(bob, LOCK_AMOUNT * 2);
         vm.stopPrank();
 
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
@@ -212,17 +212,17 @@ contract LockerVotesTest is Test {
         vm.startPrank(alice);
         locker.delegate(alice);
 
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
 
         locker.unlock();
         assertEq(locker.getVotes(alice), 0);
 
         vm.warp(block.timestamp + 14 days);
-        locker.withdraw();
+        locker.withdraw(alice);
         assertEq(locker.getVotes(alice), 0);
 
-        locker.lock(LOCK_AMOUNT * 2);
+        locker.lock(alice, LOCK_AMOUNT * 2);
         assertEq(locker.getVotes(alice), LOCK_AMOUNT * 2);
 
         vm.stopPrank();

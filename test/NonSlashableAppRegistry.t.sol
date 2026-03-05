@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {ILock2} from "../src/interfaces/ILock2.sol";
+import {ILock} from "../src/interfaces/ILock.sol";
 import {NonSlashableAppRegistry} from "../src/NonSlashableAppRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 
@@ -41,12 +41,12 @@ contract NonSlashableAppRegistryTest_Base is Test {
 // -------------------------------------------------------------------------
 contract NonSlashableAppRegistryTest_constructor is NonSlashableAppRegistryTest_Base {
     function test_revert_ifAssetIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(ILock2.InvalidAddress.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAddress.selector));
         new NonSlashableAppRegistry(address(0), UNLOCK_PERIOD);
     }
 
     function test_revert_ifUnlockPeriodIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(ILock2.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
         new NonSlashableAppRegistry(address(token), 0);
     }
 
@@ -64,7 +64,7 @@ contract NonSlashableAppRegistryTest_constructor is NonSlashableAppRegistryTest_
 // -------------------------------------------------------------------------
 contract NonSlashableAppRegistryTest_initialState is NonSlashableAppRegistryTest_Base {
     function test_idle() public view {
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock2.LockState.Idle));
+        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
     }
 
     function test_zeroBalance() public view {
@@ -88,13 +88,13 @@ contract NonSlashableAppRegistryTest_lock is NonSlashableAppRegistryTest_Base {
         assertEq(token.balanceOf(address(vault)), LOCK_AMOUNT);
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT);
-        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock2.LockState.Locked));
+        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock.LockState.Locked));
     }
 
     function test_lock_emitsEvent_Locked() public {
         vm.prank(alice);
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock2.Locked(alice, LOCK_AMOUNT, LOCK_AMOUNT);
+        emit ILock.Locked(alice, LOCK_AMOUNT, LOCK_AMOUNT);
         vault.lock(alice, LOCK_AMOUNT);
     }
 
@@ -109,7 +109,7 @@ contract NonSlashableAppRegistryTest_lock is NonSlashableAppRegistryTest_Base {
 
     function test_lock_revert_ifAmountIsZero() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(ILock2.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
         vault.lock(alice, 0);
     }
 
@@ -118,7 +118,7 @@ contract NonSlashableAppRegistryTest_lock is NonSlashableAppRegistryTest_Base {
         vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
 
-        vm.expectRevert(abi.encodeWithSelector(ILock2.AlreadyUnlocking.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.AlreadyUnlocking.selector));
         vault.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
     }
@@ -146,7 +146,7 @@ contract NonSlashableAppRegistryTest_lock is NonSlashableAppRegistryTest_Base {
         vm.stopPrank();
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(ILock2.AlreadyUnlocking.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.AlreadyUnlocking.selector));
         vault.lock(alice, LOCK_AMOUNT);
     }
 }
@@ -166,20 +166,20 @@ contract NonSlashableAppRegistryTest_unlock is NonSlashableAppRegistryTest_Base 
         vault.unlock();
 
         assertEq(vault.unlockTimestampOf(alice), block.timestamp + UNLOCK_PERIOD);
-        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock2.LockState.Unlocking));
+        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock.LockState.Unlocking));
     }
 
     function test_unlock_emitsEvent_UnlockInitiated() public {
         vm.prank(alice);
         uint256 expectedAvailableAt = block.timestamp + UNLOCK_PERIOD;
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock2.UnlockInitiated(alice, LOCK_AMOUNT, expectedAvailableAt);
+        emit ILock.UnlockInitiated(alice, LOCK_AMOUNT, expectedAvailableAt);
         vault.unlock();
     }
 
     function test_unlock_revert_ifZeroLocked() public {
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(ILock2.NotLocked.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.NotLocked.selector));
         vault.unlock();
     }
 
@@ -187,7 +187,7 @@ contract NonSlashableAppRegistryTest_unlock is NonSlashableAppRegistryTest_Base 
         vm.startPrank(alice);
         vault.unlock();
 
-        vm.expectRevert(abi.encodeWithSelector(ILock2.AlreadyUnlocking.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.AlreadyUnlocking.selector));
         vault.unlock();
         vm.stopPrank();
     }
@@ -209,14 +209,14 @@ contract NonSlashableAppRegistryTest_relock is NonSlashableAppRegistryTest_Base 
         vm.prank(alice);
         vault.relock();
 
-        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock2.LockState.Locked));
+        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock.LockState.Locked));
         assertEq(vault.unlockTimestampOf(alice), 0);
     }
 
     function test_relock_emitsRelocked() public {
         vm.prank(alice);
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock2.Relocked(alice, LOCK_AMOUNT);
+        emit ILock.Relocked(alice, LOCK_AMOUNT);
         vault.relock();
     }
 
@@ -224,7 +224,7 @@ contract NonSlashableAppRegistryTest_relock is NonSlashableAppRegistryTest_Base 
         vm.startPrank(bob);
         vault.lock(bob, LOCK_AMOUNT);
 
-        vm.expectRevert(abi.encodeWithSelector(ILock2.NotUnlocking.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
         vault.relock();
         vm.stopPrank();
     }
@@ -250,7 +250,7 @@ contract NonSlashableAppRegistryTest_withdraw is NonSlashableAppRegistryTest_Bas
         vault.withdraw(alice);
 
         assertEq(token.balanceOf(alice), balBefore + LOCK_AMOUNT);
-        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock2.LockState.Idle));
+        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock.LockState.Idle));
     }
 
     function test_withdraw_emitsEvent_Withdrawn() public {
@@ -258,7 +258,7 @@ contract NonSlashableAppRegistryTest_withdraw is NonSlashableAppRegistryTest_Bas
 
         vm.prank(alice);
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock2.Withdrawn(alice, LOCK_AMOUNT);
+        emit ILock.Withdrawn(alice, LOCK_AMOUNT);
         vault.withdraw(alice);
     }
 
@@ -266,7 +266,7 @@ contract NonSlashableAppRegistryTest_withdraw is NonSlashableAppRegistryTest_Bas
         vm.startPrank(bob);
         vault.lock(bob, LOCK_AMOUNT);
 
-        vm.expectRevert(abi.encodeWithSelector(ILock2.NotUnlocking.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
         vault.withdraw(bob);
         vm.stopPrank();
     }
@@ -276,7 +276,7 @@ contract NonSlashableAppRegistryTest_withdraw is NonSlashableAppRegistryTest_Bas
         vm.warp(availableAt - 1);
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(ILock2.UnlockPeriodNotElapsed.selector, availableAt));
+        vm.expectRevert(abi.encodeWithSelector(ILock.UnlockPeriodNotElapsed.selector, availableAt));
         vault.withdraw(alice);
     }
 
@@ -301,16 +301,16 @@ contract NonSlashableAppRegistryTest_fullCycle is NonSlashableAppRegistryTest_Ba
 
         vm.prank(alice);
         vault.lock(alice, LOCK_AMOUNT);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock2.LockState.Locked));
+        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
 
         vm.prank(alice);
         vault.unlock();
-        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock2.LockState.Unlocking));
+        assertEq(uint8(vault.lockStateOf(alice)), uint8(ILock.LockState.Unlocking));
 
         vm.warp(block.timestamp + UNLOCK_PERIOD);
         vm.prank(alice);
         vault.withdraw(alice);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock2.LockState.Idle));
+        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
 
         assertEq(token.balanceOf(alice), aliceBalBefore);
     }

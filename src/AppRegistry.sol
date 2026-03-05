@@ -11,7 +11,7 @@ import {ISlash} from "./interfaces/ISlash.sol";
 
 /**
  * @title AppRegistry
- * @notice Registry for app owners who lock collateral. Authorised adjudicators
+ * @notice Registry for Clearnet users and app owners who lock collateral. Authorised adjudicators
  *         can slash a participant's balance as penalty for misbehaviour.
  *
  * @dev Access control:
@@ -83,56 +83,59 @@ contract AppRegistry is ILock, ISlash, AccessControl, ReentrancyGuard {
     // -------------------------------------------------------------------------
 
     /// @inheritdoc ILock
-    function lock(uint256 amount) external nonReentrant {
-        if (amount == 0) revert InvalidAmount();
-        if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
+    function lock(address target, uint256 amount) external nonReentrant {
+        require(amount != 0, InvalidAmount());
+        require(_unlockTimestamps[target] == 0, AlreadyUnlocking());
 
         uint256 balanceBefore = IERC20(ASSET).balanceOf(address(this));
         IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amount);
         uint256 received = IERC20(ASSET).balanceOf(address(this)) - balanceBefore;
 
-        uint256 newBalance = _balances[msg.sender] + received;
-        _balances[msg.sender] = newBalance;
+        uint256 newBalance = _balances[target] + received;
+        _balances[target] = newBalance;
 
-        emit Locked(msg.sender, newBalance);
+        emit Locked(target, received, newBalance);
     }
 
     /// @inheritdoc ILock
     function unlock() external {
-        uint256 balance = _balances[msg.sender];
-        if (balance == 0) revert NotLocked();
-        if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
+        address account = msg.sender;
+        uint256 balance = _balances[account];
+        require(balance != 0, NotLocked());
+        require(_unlockTimestamps[account] == 0, AlreadyUnlocking());
 
         uint256 availableAt = block.timestamp + UNLOCK_PERIOD;
-        _unlockTimestamps[msg.sender] = availableAt;
+        _unlockTimestamps[account] = availableAt;
 
-        emit UnlockInitiated(msg.sender, balance, availableAt);
+        emit UnlockInitiated(account, balance, availableAt);
     }
 
     /// @inheritdoc ILock
     function relock() external {
-        if (_unlockTimestamps[msg.sender] == 0) revert NotUnlocking();
+        address account = msg.sender;
+        require(_unlockTimestamps[account] != 0, NotUnlocking());
 
-        uint256 balance = _balances[msg.sender];
-        _unlockTimestamps[msg.sender] = 0;
+        uint256 balance = _balances[account];
+        _unlockTimestamps[account] = 0;
 
-        emit Relocked(msg.sender, balance);
+        emit Relocked(account, balance);
     }
 
     /// @inheritdoc ILock
-    function withdraw() external nonReentrant {
-        uint256 unlockTimestamp = _unlockTimestamps[msg.sender];
-        if (unlockTimestamp == 0) revert NotUnlocking();
-        if (block.timestamp < unlockTimestamp) revert UnlockPeriodNotElapsed(unlockTimestamp);
+    function withdraw(address destination) external nonReentrant {
+        address account = msg.sender;
+        uint256 unlockTimestamp = _unlockTimestamps[account];
+        require(unlockTimestamp != 0, NotUnlocking());
+        require(block.timestamp >= unlockTimestamp, UnlockPeriodNotElapsed(unlockTimestamp));
 
-        uint256 amount = _balances[msg.sender];
+        uint256 amount = _balances[account];
 
-        _balances[msg.sender] = 0;
-        _unlockTimestamps[msg.sender] = 0;
+        _balances[account] = 0;
+        _unlockTimestamps[account] = 0;
 
-        IERC20(ASSET).safeTransfer(msg.sender, amount);
+        IERC20(ASSET).safeTransfer(destination, amount);
 
-        emit Withdrawn(msg.sender, amount);
+        emit Withdrawn(account, amount);
     }
 
     // -------------------------------------------------------------------------
@@ -142,8 +145,8 @@ contract AppRegistry is ILock, ISlash, AccessControl, ReentrancyGuard {
     /// @inheritdoc ISlash
     function slash(address user, uint256 amount) external onlyRole(ADJUDICATOR_ROLE) nonReentrant {
         uint256 balance = _balances[user];
-        if (balance == 0) revert InsufficientBalance();
-        if (amount > balance) revert InsufficientBalance();
+        require(balance != 0, InsufficientBalance());
+        require(amount <= balance, InsufficientBalance());
 
         uint256 newBalance = balance - amount;
         _balances[user] = newBalance;

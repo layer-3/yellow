@@ -52,22 +52,23 @@ interface ILock {
     // Events
     // -------------------------------------------------------------------------
 
-    /// @param user   The user that locked tokens.
-    /// @param amount The cumulative locked balance after this call.
-    event Locked(address indexed user, uint256 amount);
+    /// @param user The user that locked tokens.
+    /// @param deposited The amount of tokens deposited in this call.
+    /// @param newBalance The cumulative locked balance after this call.
+    event Locked(address indexed user, uint256 deposited, uint256 newBalance);
 
-    /// @param user        The user that initiated unlock.
-    /// @param amount      The full balance queued for withdrawal.
+    /// @param user The user that initiated unlock.
+    /// @param balance  The full balance queued for withdrawal.
     /// @param availableAt Timestamp when withdraw() becomes callable.
-    event UnlockInitiated(address indexed user, uint256 amount, uint256 availableAt);
+    event UnlockInitiated(address indexed user, uint256 balance, uint256 availableAt);
 
-    /// @param user   The user that cancelled an unlock and relocked.
-    /// @param amount The balance that was relocked.
-    event Relocked(address indexed user, uint256 amount);
+    /// @param user The user that cancelled an unlock and relocked.
+    /// @param balance The balance that was relocked.
+    event Relocked(address indexed user, uint256 balance);
 
-    /// @param user   The user that withdrew.
-    /// @param amount The amount withdrawn.
-    event Withdrawn(address indexed user, uint256 amount);
+    /// @param user The user that withdrew.
+    /// @param balance The amount withdrawn.
+    event Withdrawn(address indexed user, uint256 balance);
 
     // -------------------------------------------------------------------------
     // View functions
@@ -89,10 +90,10 @@ interface ILock {
     // Mutating functions
     // -------------------------------------------------------------------------
 
-    /// @notice Transfers `amount` tokens from the caller into the vault.
+    /// @notice Transfers `amount` tokens from the caller into the vault, crediting `target`.
     ///         Can be called multiple times to add to an existing Locked balance.
-    ///         Reverts with AlreadyUnlocking if the caller is in the Unlocking state.
-    function lock(uint256 amount) external;
+    ///         Reverts with AlreadyUnlocking if `target` is in the Unlocking state.
+    function lock(address target, uint256 amount) external;
 
     /// @notice Starts the waiting period for the caller's full balance.
     ///         Reverts with NotLocked if the caller has no balance.
@@ -103,8 +104,8 @@ interface ILock {
     ///         Restores voting power. Reverts with NotUnlocking if not unlocking.
     function relock() external;
 
-    /// @notice Transfers the caller's full balance back to them.
+    /// @notice Transfers the caller's full balance to `destination`.
     ///         Reverts with NotUnlocking if unlock() was not called.
     ///         Reverts with UnlockPeriodNotElapsed if the waiting period has not elapsed.
-    function withdraw() external;
+    function withdraw(address destination) external;
 }

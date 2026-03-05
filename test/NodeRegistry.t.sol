@@ -87,7 +87,7 @@ contract LockerTest is Test {
         uint256 balBefore = token.balanceOf(alice);
 
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         assertEq(token.balanceOf(alice), balBefore - LOCK_AMOUNT);
         assertEq(token.balanceOf(address(vault)), LOCK_AMOUNT);
@@ -95,14 +95,14 @@ contract LockerTest is Test {
 
     function test_lock_updatesBalance() public {
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT);
     }
 
     function test_lock_setsStateLocked() public {
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
     }
@@ -110,14 +110,14 @@ contract LockerTest is Test {
     function test_lock_emitsLocked() public {
         vm.prank(alice);
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock.Locked(alice, LOCK_AMOUNT);
-        vault.lock(LOCK_AMOUNT);
+        emit ILock.Locked(alice, LOCK_AMOUNT, LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
     }
 
     function test_lock_topUp() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT * 2);
@@ -125,36 +125,36 @@ contract LockerTest is Test {
 
     function test_lock_topUp_emitsCumulativeBalance() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         vm.expectEmit(true, false, false, true, address(vault));
-        emit ILock.Locked(alice, LOCK_AMOUNT * 2);
-        vault.lock(LOCK_AMOUNT);
+        emit ILock.Locked(alice, LOCK_AMOUNT, LOCK_AMOUNT * 2);
+        vault.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
     }
 
     function test_lock_revert_ifAmountIsZero() public {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
-        vault.lock(0);
+        vault.lock(alice, 0);
     }
 
     function test_lock_revert_ifAlreadyUnlocking() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
 
         vm.expectRevert(abi.encodeWithSelector(ILock.AlreadyUnlocking.selector));
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
     }
 
     function test_lock_independentPerUser() public {
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         vm.prank(bob);
-        vault.lock(LOCK_AMOUNT * 2);
+        vault.lock(bob, LOCK_AMOUNT * 2);
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT);
         assertEq(vault.balanceOf(bob), LOCK_AMOUNT * 2);
@@ -164,7 +164,7 @@ contract LockerTest is Test {
         amount = bound(amount, 1, token.balanceOf(alice));
 
         vm.prank(alice);
-        vault.lock(amount);
+        vault.lock(alice, amount);
 
         assertEq(vault.balanceOf(alice), amount);
     }
@@ -175,7 +175,7 @@ contract LockerTest is Test {
 
     function test_unlock_setsUnlockTimestamp() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
@@ -184,7 +184,7 @@ contract LockerTest is Test {
 
     function test_unlock_setsStateUnlocking() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
@@ -193,7 +193,7 @@ contract LockerTest is Test {
 
     function test_unlock_emitsUnlockInitiated() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         uint256 expectedAvailableAt = block.timestamp + 14 days;
         vm.expectEmit(true, false, false, true, address(vault));
@@ -210,7 +210,7 @@ contract LockerTest is Test {
 
     function test_unlock_revert_ifAlreadyUnlocking() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
 
         vm.expectRevert(abi.encodeWithSelector(ILock.AlreadyUnlocking.selector));
@@ -224,7 +224,7 @@ contract LockerTest is Test {
 
     function test_withdraw_transfersTokensBack() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
@@ -232,7 +232,7 @@ contract LockerTest is Test {
 
         uint256 balBefore = token.balanceOf(alice);
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         assertEq(token.balanceOf(alice), balBefore + LOCK_AMOUNT);
         assertEq(token.balanceOf(address(vault)), 0);
@@ -240,49 +240,49 @@ contract LockerTest is Test {
 
     function test_withdraw_resetsBalanceToZero() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
         vm.warp(block.timestamp + 14 days);
 
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         assertEq(vault.balanceOf(alice), 0);
     }
 
     function test_withdraw_resetsUnlockTimestampToZero() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
         vm.warp(block.timestamp + 14 days);
 
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         assertEq(vault.unlockTimestampOf(alice), 0);
     }
 
     function test_withdraw_setsStateIdle() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
         vm.warp(block.timestamp + 14 days);
 
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
     }
 
     function test_withdraw_emitsWithdrawn() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
@@ -291,27 +291,27 @@ contract LockerTest is Test {
         vm.prank(alice);
         vm.expectEmit(true, false, false, true, address(vault));
         emit ILock.Withdrawn(alice, LOCK_AMOUNT);
-        vault.withdraw();
+        vault.withdraw(alice);
     }
 
     function test_withdraw_revert_ifNotUnlocking() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
-        vault.withdraw();
+        vault.withdraw(alice);
         vm.stopPrank();
     }
 
     function test_withdraw_revert_ifIdle() public {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
-        vault.withdraw();
+        vault.withdraw(alice);
     }
 
     function test_withdraw_revert_ifPeriodNotElapsed() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
@@ -320,19 +320,19 @@ contract LockerTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(ILock.UnlockPeriodNotElapsed.selector, availableAt));
-        vault.withdraw();
+        vault.withdraw(alice);
     }
 
     function test_withdraw_exactlyAtUnlockTimestamp() public {
         vm.startPrank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.stopPrank();
 
         vm.warp(vault.unlockTimestampOf(alice));
 
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         assertEq(vault.balanceOf(alice), 0);
     }
@@ -346,7 +346,7 @@ contract LockerTest is Test {
 
         // Lock
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
 
         // Unlock
@@ -357,7 +357,7 @@ contract LockerTest is Test {
         // Withdraw
         vm.warp(block.timestamp + 14 days);
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
 
         assertEq(token.balanceOf(alice), aliceBalBefore);
@@ -367,13 +367,13 @@ contract LockerTest is Test {
         vm.startPrank(alice);
 
         // First cycle
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         vault.unlock();
         vm.warp(block.timestamp + 14 days);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         // Second cycle
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT);
 
@@ -383,11 +383,11 @@ contract LockerTest is Test {
     function test_fullCycle_multipleUsersIndependent() public {
         // Alice locks
         vm.prank(alice);
-        vault.lock(LOCK_AMOUNT);
+        vault.lock(alice, LOCK_AMOUNT);
 
         // Bob locks
         vm.prank(bob);
-        vault.lock(LOCK_AMOUNT * 2);
+        vault.lock(bob, LOCK_AMOUNT * 2);
 
         // Alice unlocks
         vm.prank(alice);
@@ -399,7 +399,7 @@ contract LockerTest is Test {
         // Warp and alice withdraws
         vm.warp(block.timestamp + 14 days);
         vm.prank(alice);
-        vault.withdraw();
+        vault.withdraw(alice);
 
         // Bob's balance is untouched
         assertEq(vault.balanceOf(bob), LOCK_AMOUNT * 2);
