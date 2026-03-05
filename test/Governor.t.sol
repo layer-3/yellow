@@ -275,7 +275,7 @@ contract YellowGovernorTest is Test {
     // Treasury is Foundation-owned (not governance-controlled)
     // -------------------------------------------------------------------------
 
-    function test_treasury_foundationCanWithdraw() public {
+    function test_treasury_foundationCanTransfer() public {
         uint256 amount = 100 ether;
 
         // Send tokens to treasury
@@ -284,17 +284,17 @@ contract YellowGovernorTest is Test {
 
         uint256 aliceBalBefore = token.balanceOf(alice);
 
-        // Foundation withdraws directly
+        // Foundation transfers directly
         vm.prank(foundation);
-        treasury.withdraw(address(token), alice, amount);
+        treasury.transfer(address(token), alice, amount);
 
         assertEq(token.balanceOf(alice), aliceBalBefore + amount);
     }
 
-    function test_treasury_directWithdrawReverts() public {
+    function test_treasury_directTransferReverts() public {
         vm.prank(alice);
         vm.expectRevert();
-        treasury.withdraw(address(token), alice, 1 ether);
+        treasury.transfer(address(token), alice, 1 ether);
     }
 
     // -------------------------------------------------------------------------

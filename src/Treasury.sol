@@ -17,7 +17,7 @@ contract Treasury is Ownable2Step, ReentrancyGuard {
     /// @notice Human-readable label for this treasury (e.g. "Grants", "Operations").
     string public name;
 
-    event Withdrawn(address indexed token, address indexed to, uint256 amount);
+    event Transferred(address indexed token, address indexed to, uint256 amount);
 
     constructor(address initialOwner, string memory name_) Ownable(initialOwner) {
         name = name_;
@@ -30,7 +30,7 @@ contract Treasury is Ownable2Step, ReentrancyGuard {
      * @param amount Amount to transfer (for ERC20 fee-on-transfer tokens,
      *        the event emits the actual amount received by `to`).
      */
-    function withdraw(address token, address to, uint256 amount) external onlyOwner nonReentrant {
+    function transfer(address token, address to, uint256 amount) external onlyOwner nonReentrant {
         require(to != address(0), "Zero address target");
         require(amount > 0, "Zero amount");
 
@@ -38,12 +38,12 @@ contract Treasury is Ownable2Step, ReentrancyGuard {
             require(address(this).balance >= amount, "Insufficient ETH");
             (bool success,) = payable(to).call{value: amount}("");
             require(success, "ETH transfer failed");
-            emit Withdrawn(token, to, amount);
+            emit Transferred(token, to, amount);
         } else {
             uint256 balBefore = IERC20(token).balanceOf(to);
             IERC20(token).safeTransfer(to, amount);
             uint256 received = IERC20(token).balanceOf(to) - balBefore;
-            emit Withdrawn(token, to, received);
+            emit Transferred(token, to, received);
         }
     }
 

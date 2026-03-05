@@ -258,3 +258,87 @@ contract AppRegistryTest_slash_edgeCases is AppRegistryTest_slash_base {
         assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Locked));
     }
 }
+
+// -------------------------------------------------------------------------
+// Slash cooldown
+// -------------------------------------------------------------------------
+contract AppRegistryTest_slashCooldown is AppRegistryTest_slash_base {
+    uint256 constant COOLDOWN = 1 hours;
+
+    function setUp() public override {
+        super.setUp();
+
+        vm.prank(owner);
+        appRegistry.setSlashCooldown(COOLDOWN);
+
+        vm.prank(alice);
+        appRegistry.lock(alice, LOCK_AMOUNT);
+        vm.prank(bob);
+        appRegistry.lock(bob, LOCK_AMOUNT);
+    }
+
+    function test_setSlashCooldown_onlyAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        appRegistry.setSlashCooldown(2 hours);
+    }
+
+    function test_setSlashCooldown_emitsEvent() public {
+        vm.prank(owner);
+        vm.expectEmit(false, false, false, true, address(appRegistry));
+        emit AppRegistry.SlashCooldownUpdated(COOLDOWN, 2 hours);
+        appRegistry.setSlashCooldown(2 hours);
+
+        assertEq(appRegistry.slashCooldown(), 2 hours);
+    }
+
+    function test_slash_revert_ifCooldownActive() public {
+        vm.prank(adjudicator);
+        appRegistry.slash(alice, 100 ether, treasury, "first");
+
+        vm.prank(adjudicator);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AppRegistry.SlashCooldownActive.selector, block.timestamp + COOLDOWN
+            )
+        );
+        appRegistry.slash(bob, 100 ether, treasury, "second");
+    }
+
+    function test_slash_succeedsAfterCooldown() public {
+        vm.prank(adjudicator);
+        appRegistry.slash(alice, 100 ether, treasury, "first");
+
+        vm.warp(block.timestamp + COOLDOWN);
+
+        vm.prank(adjudicator);
+        appRegistry.slash(bob, 100 ether, treasury, "second");
+
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - 100 ether);
+        assertEq(appRegistry.balanceOf(bob), LOCK_AMOUNT - 100 ether);
+    }
+
+    function test_slash_batchingBlockedWithCooldown() public {
+        // Adjudicator cannot slash two users in the same block
+        vm.startPrank(adjudicator);
+        appRegistry.slash(alice, 100 ether, treasury, "first");
+
+        vm.expectRevert();
+        appRegistry.slash(bob, 100 ether, treasury, "second");
+        vm.stopPrank();
+    }
+
+    function test_slash_noCooldown_batchingAllowed() public {
+        // Disable cooldown
+        vm.prank(owner);
+        appRegistry.setSlashCooldown(0);
+
+        vm.startPrank(adjudicator);
+        appRegistry.slash(alice, 100 ether, treasury, "first");
+        appRegistry.slash(bob, 100 ether, treasury, "second");
+        vm.stopPrank();
+
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - 100 ether);
+        assertEq(appRegistry.balanceOf(bob), LOCK_AMOUNT - 100 ether);
+    }
+}

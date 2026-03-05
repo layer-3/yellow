@@ -29,9 +29,27 @@ contract AppRegistry is Locker, ISlash, AccessControl {
 
     bytes32 public constant ADJUDICATOR_ROLE = keccak256("ADJUDICATOR_ROLE");
 
+    /// @notice Minimum time (seconds) that must elapse between any two slash calls.
+    uint256 public slashCooldown;
+
+    /// @notice Timestamp of the last successful slash.
+    uint256 public lastSlashTimestamp;
+
+    error SlashCooldownActive(uint256 availableAt);
+
+    event SlashCooldownUpdated(uint256 oldCooldown, uint256 newCooldown);
+
     constructor(address asset_, uint256 unlockPeriod_, address admin_) Locker(asset_, unlockPeriod_) {
         if (admin_ == address(0)) revert InvalidAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
+    }
+
+    /// @notice Sets the global cooldown between slash calls.
+    /// @param newCooldown The new cooldown in seconds (0 disables the cooldown).
+    function setSlashCooldown(uint256 newCooldown) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 oldCooldown = slashCooldown;
+        slashCooldown = newCooldown;
+        emit SlashCooldownUpdated(oldCooldown, newCooldown);
     }
 
     /// @inheritdoc ISlash
@@ -40,6 +58,13 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         onlyRole(ADJUDICATOR_ROLE)
         nonReentrant
     {
+        uint256 _lastSlash = lastSlashTimestamp;
+        uint256 _cooldown = slashCooldown;
+        if (_cooldown != 0 && _lastSlash != 0) {
+            uint256 availableAt = _lastSlash + _cooldown;
+            require(block.timestamp >= availableAt, SlashCooldownActive(availableAt));
+        }
+
         require(recipient != msg.sender, RecipientIsAdjudicator());
 
         uint256 balance = _balances[user];
@@ -53,6 +78,8 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         if (newBalance == 0) {
             _unlockTimestamps[user] = 0;
         }
+
+        lastSlashTimestamp = block.timestamp;
 
         IERC20(ASSET).safeTransfer(recipient, amount);
 
