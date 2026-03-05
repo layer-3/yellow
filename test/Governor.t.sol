@@ -81,13 +81,13 @@ contract YellowGovernorTest is Test {
         // Alice & bob approve and lock tokens, delegate to self
         vm.startPrank(alice);
         token.approve(address(locker), type(uint256).max);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.delegate(alice);
         vm.stopPrank();
 
         vm.startPrank(bob);
         token.approve(address(locker), type(uint256).max);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(bob, LOCK_AMOUNT);
         locker.delegate(bob);
         vm.stopPrank();
 
@@ -374,8 +374,8 @@ contract YellowGovernorTest is Test {
 
         // Alice withdraws and re-locks
         vm.startPrank(alice);
-        locker.withdraw();
-        locker.lock(LOCK_AMOUNT);
+        locker.withdraw(alice);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         vm.roll(block.number + 1);
@@ -570,7 +570,7 @@ contract YellowGovernorTest is Test {
         vm.startPrank(alice);
         locker.unlock();
         locker.relock();
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         assertEq(locker.balanceOf(alice), LOCK_AMOUNT * 2);
