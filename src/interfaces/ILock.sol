@@ -35,6 +35,9 @@ interface ILock {
     /// @notice Amount must be greater than zero.
     error InvalidAmount();
 
+    /// @notice Unlock period must be greater than zero.
+    error InvalidPeriod();
+
     /// @notice Caller has no locked balance.
     error NotLocked();
 

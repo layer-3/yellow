@@ -11,11 +11,42 @@ import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
+/// @dev Test harness that exposes internal quorum floor update for testing.
+contract YellowGovernorHarness is YellowGovernor {
+    constructor(
+        IVotes locker_,
+        TimelockController timelock_,
+        uint48 votingDelay_,
+        uint32 votingPeriod_,
+        uint256 proposalThreshold_,
+        uint256 quorumNumerator_,
+        uint256 quorumFloor_,
+        uint48 voteExtension_,
+        address proposalGuardian_
+    )
+        YellowGovernor(
+            locker_,
+            timelock_,
+            votingDelay_,
+            votingPeriod_,
+            proposalThreshold_,
+            quorumNumerator_,
+            quorumFloor_,
+            voteExtension_,
+            proposalGuardian_
+        )
+    {}
+
+    function updateQuorumFloorUnsafe(uint256 newFloor) external {
+        _updateQuorumFloor(newFloor);
+    }
+}
+
 contract YellowGovernorTest is Test {
     YellowToken token;
     NodeRegistry locker;
     TimelockController timelock;
-    YellowGovernor governor;
+    YellowGovernorHarness governor;
     Treasury treasury;
 
     address deployer = address(1);
@@ -29,6 +60,7 @@ contract YellowGovernorTest is Test {
     uint256 constant PROPOSAL_THRESHOLD = 0; // no threshold for tests
     uint256 constant QUORUM_NUMERATOR = 4; // 4%
     uint256 constant QUORUM_FLOOR = 50_000 ether; // low floor for tests
+    uint48 constant VOTE_EXTENSION = 10; // 10 blocks for late-quorum tests
     uint256 constant TIMELOCK_DELAY = 1 days;
 
     uint256 constant LOCK_AMOUNT = 1_000_000 ether;
@@ -49,14 +81,16 @@ contract YellowGovernorTest is Test {
         timelock = new TimelockController(TIMELOCK_DELAY, proposers, executors, deployer);
 
         // Deploy governor
-        governor = new YellowGovernor(
+        governor = new YellowGovernorHarness(
             IVotes(address(locker)),
             timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
             QUORUM_NUMERATOR,
-            QUORUM_FLOOR
+            QUORUM_FLOOR,
+            VOTE_EXTENSION,
+            foundation // proposal guardian = Foundation multisig
         );
 
         // Grant governor the proposer & canceller roles on timelock
@@ -486,6 +520,50 @@ contract YellowGovernorTest is Test {
         assertEq(governor.quorum(block.number - 1), expectedFractional);
     }
 
+    function test_quorumFloor_snapshotted_floorChangeDoesNotAffectExistingProposal() public {
+        // Both unlock so total supply drops to 0 — fractional quorum = 0,
+        // so quorum is entirely determined by the floor.
+        vm.prank(alice);
+        locker.unlock();
+        vm.prank(bob);
+        locker.unlock();
+
+        // Relock only alice with just enough to meet the current floor
+        vm.warp(block.timestamp + 14 days);
+        vm.startPrank(alice);
+        locker.withdraw(alice);
+        locker.lock(alice, QUORUM_FLOOR); // exactly 50_000
+        vm.stopPrank();
+
+        vm.roll(10);
+
+        // Create proposal — snapshot taken now (floor = 50_000, supply = 50_000)
+        uint256 proposalId = _createProposal();
+        vm.roll(10 + VOTING_DELAY + 1); // block 12
+
+        // Alice votes for — her 50_000 meets the floor exactly
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+
+        // Governance raises the floor AFTER voting starts.
+        // With the M-01 fix (checkpointed), this should NOT affect the existing proposal.
+        // Without the fix (plain uint256), this WOULD retroactively break it.
+        vm.roll(20); // advance so clock() - 1 is valid for supply check
+        _setQuorumFloorDirectly(QUORUM_FLOOR * 2); // raise to 100_000
+
+        vm.roll(10 + VOTING_DELAY + VOTING_PERIOD + 2); // past voting end
+
+        // With snapshotted floor: quorum(snapshot) uses old floor (50_000) → proposal succeeds
+        // Without snapshot: quorum(snapshot) uses new floor (100_000) → proposal defeated
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
+    }
+
+    function test_quorumFloor_snapshotted_historicalLookup() public {
+        uint256 blockBefore = block.number;
+        vm.roll(block.number + 10);
+        assertEq(governor.quorumFloor(blockBefore), QUORUM_FLOOR);
+    }
+
     function test_quorumFloor_defeatsProposalWhenBelowFloor() public {
         // Both unlock — total supply drops to 0
         vm.prank(alice);
@@ -509,6 +587,85 @@ contract YellowGovernorTest is Test {
 
         // Quorum floor = 50_000 ether, forVotes = 0 → defeated
         assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
+    }
+
+    // -------------------------------------------------------------------------
+    // Late quorum protection
+    // -------------------------------------------------------------------------
+
+    function test_lateQuorum_extendsDeadlineWhenQuorumReachedLate() public {
+        uint256 proposalId = _createProposal();
+        vm.roll(block.number + VOTING_DELAY + 1);
+
+        uint256 originalDeadline = governor.proposalDeadline(proposalId);
+
+        // Advance to near the end of voting period (1 block before deadline)
+        vm.roll(originalDeadline);
+
+        // Alice casts the decisive vote that reaches quorum
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+        vm.prank(bob);
+        governor.castVote(proposalId, 1);
+
+        // Deadline should be extended by VOTE_EXTENSION
+        uint256 newDeadline = governor.proposalDeadline(proposalId);
+        assertGt(newDeadline, originalDeadline);
+    }
+
+    function test_lateQuorum_noExtensionWhenQuorumReachedEarly() public {
+        uint256 proposalId = _createProposal();
+        vm.roll(block.number + VOTING_DELAY + 1);
+
+        uint256 originalDeadline = governor.proposalDeadline(proposalId);
+
+        // Both vote immediately (far from deadline)
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+        vm.prank(bob);
+        governor.castVote(proposalId, 1);
+
+        // Deadline should NOT be extended (quorum reached well before deadline)
+        assertEq(governor.proposalDeadline(proposalId), originalDeadline);
+    }
+
+    function test_lateQuorum_voteExtensionConfigured() public view {
+        assertEq(governor.lateQuorumVoteExtension(), VOTE_EXTENSION);
+    }
+
+    // -------------------------------------------------------------------------
+    // Proposal guardian
+    // -------------------------------------------------------------------------
+
+    function test_proposalGuardian_returnsFoundation() public view {
+        assertEq(governor.proposalGuardian(), foundation);
+    }
+
+    function test_proposalGuardian_canCancelProposal() public {
+        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
+            _dummyProposal();
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+
+        // Guardian cancels
+        vm.prank(foundation);
+        governor.cancel(targets, values, calldatas, keccak256(bytes(description)));
+
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
+    }
+
+    function test_proposalGuardian_nonGuardianCannotCancel() public {
+        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
+            _dummyProposal();
+
+        vm.prank(alice);
+        governor.propose(targets, values, calldatas, description);
+
+        // Random user cannot cancel
+        vm.prank(bob);
+        vm.expectRevert();
+        governor.cancel(targets, values, calldatas, keccak256(bytes(description)));
     }
 
     // -------------------------------------------------------------------------
@@ -684,5 +841,10 @@ contract YellowGovernorTest is Test {
         governor.castVote(proposalId, 1);
 
         vm.roll(block.number + VOTING_PERIOD + 1);
+    }
+
+    /// @dev Updates the quorum floor bypassing onlyGovernance for testing.
+    function _setQuorumFloorDirectly(uint256 newFloor) internal {
+        governor.updateQuorumFloorUnsafe(newFloor);
     }
 }

@@ -21,6 +21,8 @@ import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
  *   PROPOSAL_THRESHOLD    — min voting power to propose (default: 10_000_000e18)
  *   QUORUM_NUMERATOR      — quorum as % of locked supply (default: 4)
  *   QUORUM_FLOOR          — minimum absolute quorum in tokens (default: 100_000_000e18 = 100M YELLOW)
+ *   VOTE_EXTENSION        — blocks to extend voting when quorum reached late (default: 14400 ≈ 2 days)
+ *   PROPOSAL_GUARDIAN     — address that can cancel any proposal (Foundation multisig)
  *   NODE_UNLOCK_PERIOD    — NodeRegistry withdrawal waiting period in seconds (default: 1209600 = 14 days)
  *   APP_UNLOCK_PERIOD     — AppRegistry withdrawal waiting period in seconds (default: 1209600 = 14 days)
  *   TIMELOCK_DELAY        — seconds before execution (default: 172800 = 2 days)
@@ -37,6 +39,8 @@ contract DeployRegistry is Script {
         uint256 proposalThreshold = vm.envOr("PROPOSAL_THRESHOLD", uint256(10_000_000 ether));
         uint256 quorumNumerator = vm.envOr("QUORUM_NUMERATOR", uint256(4));
         uint256 quorumFloor = vm.envOr("QUORUM_FLOOR", uint256(100_000_000 ether));
+        uint48 voteExtension = uint48(vm.envOr("VOTE_EXTENSION", uint256(14_400)));
+        address proposalGuardian = vm.envAddress("PROPOSAL_GUARDIAN");
         uint256 unlockPeriod = vm.envOr("NODE_UNLOCK_PERIOD", uint256(14 days));
         uint256 appUnlockPeriod = vm.envOr("APP_UNLOCK_PERIOD", uint256(14 days));
         uint256 timelockDelay = vm.envOr("TIMELOCK_DELAY", uint256(172_800));
@@ -71,7 +75,9 @@ contract DeployRegistry is Script {
             votingPeriod,
             proposalThreshold,
             quorumNumerator,
-            quorumFloor
+            quorumFloor,
+            voteExtension,
+            proposalGuardian
         );
         console.log("YellowGovernor:", address(governor));
 

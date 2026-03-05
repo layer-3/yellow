@@ -31,7 +31,7 @@ abstract contract Locker is ILock, ReentrancyGuard {
 
     constructor(address asset_, uint256 unlockPeriod_) {
         if (asset_ == address(0)) revert InvalidAddress();
-        if (unlockPeriod_ == 0) revert InvalidAmount();
+        if (unlockPeriod_ == 0) revert InvalidPeriod();
         ASSET = asset_;
         UNLOCK_PERIOD = unlockPeriod_;
     }

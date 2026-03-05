@@ -45,12 +45,14 @@ contract LockerVotesTest is Test {
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
     }
 
-    function test_delegate_noDelegationMeansNoVotes() public {
+    function test_delegate_autoSelfDelegateOnFirstLock() public {
         vm.prank(alice);
         locker.lock(alice, LOCK_AMOUNT);
 
         vm.roll(block.number + 1);
-        assertEq(locker.getVotes(alice), 0);
+        // Auto-self-delegation means votes are immediately active
+        assertEq(locker.getVotes(alice), LOCK_AMOUNT);
+        assertEq(locker.delegates(alice), alice);
     }
 
     function test_delegate_toAnotherAddress() public {

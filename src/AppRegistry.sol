@@ -35,7 +35,13 @@ contract AppRegistry is Locker, ISlash, AccessControl {
     }
 
     /// @inheritdoc ISlash
-    function slash(address user, uint256 amount) external onlyRole(ADJUDICATOR_ROLE) nonReentrant {
+    function slash(address user, uint256 amount, address recipient, bytes calldata decision)
+        external
+        onlyRole(ADJUDICATOR_ROLE)
+        nonReentrant
+    {
+        require(recipient != msg.sender, RecipientIsAdjudicator());
+
         uint256 balance = _balances[user];
         require(balance != 0, InsufficientBalance());
         require(amount <= balance, InsufficientBalance());
@@ -48,8 +54,8 @@ contract AppRegistry is Locker, ISlash, AccessControl {
             _unlockTimestamps[user] = 0;
         }
 
-        IERC20(ASSET).safeTransfer(msg.sender, amount);
+        IERC20(ASSET).safeTransfer(recipient, amount);
 
-        emit Slashed(user, amount, msg.sender);
+        emit Slashed(user, amount, recipient, decision);
     }
 }

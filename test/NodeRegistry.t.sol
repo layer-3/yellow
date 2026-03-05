@@ -37,7 +37,7 @@ contract NodeRegistryConstructorTest is Test {
 
     function test_revert_ifUnlockPeriodIsZero() public {
         YellowToken t = new YellowToken(address(this));
-        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidPeriod.selector));
         new NodeRegistry(address(t), 0);
     }
 

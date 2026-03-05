@@ -39,7 +39,7 @@ contract AppRegistryConstructorTest is Test {
 
     function test_revert_ifUnlockPeriodIsZero() public {
         YellowToken t = new YellowToken(address(this));
-        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(ILock.InvalidPeriod.selector));
         new AppRegistry(address(t), 0, address(this));
     }
 
@@ -101,13 +101,22 @@ contract AppRegistrySlashTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, ADJUDICATOR_ROLE)
         );
-        vault.slash(alice, 100 ether);
+        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
+    }
+
+    function test_slash_revert_ifRecipientIsAdjudicator() public {
+        vm.prank(alice);
+        vault.lock(alice, LOCK_AMOUNT);
+
+        vm.prank(adjudicator);
+        vm.expectRevert(abi.encodeWithSelector(ISlash.RecipientIsAdjudicator.selector));
+        vault.slash(alice, 100 ether, adjudicator, "0xDecisionHash");
     }
 
     function test_slash_revert_ifUserHasNoBalance() public {
         vm.prank(adjudicator);
         vm.expectRevert(abi.encodeWithSelector(ISlash.InsufficientBalance.selector));
-        vault.slash(alice, 100 ether);
+        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
     }
 
     function test_slash_revert_ifAmountExceedsBalance() public {
@@ -116,7 +125,7 @@ contract AppRegistrySlashTest is Test {
 
         vm.prank(adjudicator);
         vm.expectRevert(abi.encodeWithSelector(ISlash.InsufficientBalance.selector));
-        vault.slash(alice, LOCK_AMOUNT + 1);
+        vault.slash(alice, LOCK_AMOUNT + 1, treasury, "0xDecisionHash");
     }
 
     // -- while Locked --
@@ -127,23 +136,23 @@ contract AppRegistrySlashTest is Test {
 
         uint256 slashAmount = 300 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount);
+        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT - slashAmount);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
     }
 
-    function test_slash_locked_partialSlash_transfersToCaller() public {
+    function test_slash_locked_partialSlash_transfersToRecipient() public {
         vm.prank(alice);
         vault.lock(alice, LOCK_AMOUNT);
 
         uint256 slashAmount = 300 ether;
-        uint256 adjBalBefore = token.balanceOf(adjudicator);
+        uint256 recipientBalBefore = token.balanceOf(treasury);
 
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount);
+        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
-        assertEq(token.balanceOf(adjudicator), adjBalBefore + slashAmount);
+        assertEq(token.balanceOf(treasury), recipientBalBefore + slashAmount);
     }
 
     function test_slash_locked_fullSlash_resetsToIdle() public {
@@ -151,7 +160,7 @@ contract AppRegistrySlashTest is Test {
         vault.lock(alice, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT);
+        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
         assertEq(vault.balanceOf(alice), 0);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
@@ -164,8 +173,8 @@ contract AppRegistrySlashTest is Test {
         uint256 slashAmount = 500 ether;
         vm.prank(adjudicator);
         vm.expectEmit(true, true, false, true, address(vault));
-        emit ISlash.Slashed(alice, slashAmount, adjudicator);
-        vault.slash(alice, slashAmount);
+        emit ISlash.Slashed(alice, slashAmount, treasury, "0xDecisionHash");
+        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
     }
 
     // -- while Unlocking --
@@ -178,7 +187,7 @@ contract AppRegistrySlashTest is Test {
 
         uint256 slashAmount = 400 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount);
+        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT - slashAmount);
         assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Unlocking));
@@ -191,7 +200,7 @@ contract AppRegistrySlashTest is Test {
         vm.stopPrank();
 
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT);
+        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
         assertEq(vault.balanceOf(alice), 0);
         assertEq(vault.unlockTimestampOf(alice), 0);
@@ -206,7 +215,7 @@ contract AppRegistrySlashTest is Test {
 
         uint256 slashAmount = 200 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount);
+        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
         vm.warp(block.timestamp + 14 days);
 
@@ -224,8 +233,8 @@ contract AppRegistrySlashTest is Test {
         vault.lock(alice, LOCK_AMOUNT);
 
         vm.startPrank(adjudicator);
-        vault.slash(alice, 100 ether);
-        vault.slash(alice, 200 ether);
+        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
+        vault.slash(alice, 200 ether, treasury, "0xDecisionHash");
         vm.stopPrank();
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT - 300 ether);
@@ -238,7 +247,7 @@ contract AppRegistrySlashTest is Test {
         vault.lock(bob, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
-        vault.slash(alice, 500 ether);
+        vault.slash(alice, 500 ether, treasury, "0xDecisionHash");
 
         assertEq(vault.balanceOf(alice), LOCK_AMOUNT - 500 ether);
         assertEq(vault.balanceOf(bob), LOCK_AMOUNT);
@@ -249,7 +258,7 @@ contract AppRegistrySlashTest is Test {
         vault.lock(alice, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT);
+        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
         vm.prank(alice);
         vault.lock(alice, 500 ether);
