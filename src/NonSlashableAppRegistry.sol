@@ -70,7 +70,7 @@ contract NonSlashableAppRegistry is ILock2, ReentrancyGuard {
     // -------------------------------------------------------------------------
 
     /// @inheritdoc ILock2
-    function lock(uint256 amount, address target) external nonReentrant {
+    function lock(address target, uint256 amount) external nonReentrant {
         require(amount != 0, InvalidAmount());
         require(_unlockTimestamps[target] == 0, AlreadyUnlocking());
 

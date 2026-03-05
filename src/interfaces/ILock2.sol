@@ -93,7 +93,7 @@ interface ILock2 {
     /// @notice Transfers `amount` tokens from the caller into the vault, crediting `target`.
     ///         Can be called multiple times to add to an existing Locked balance.
     ///         Reverts with AlreadyUnlocking if `target` is in the Unlocking state.
-    function lock(uint256 amount, address target) external;
+    function lock(address target, uint256 amount) external;
 
     /// @notice Starts the waiting period for the caller's full balance.
     ///         Reverts with NotLocked if the caller has no balance.
