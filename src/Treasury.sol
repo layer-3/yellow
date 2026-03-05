@@ -47,5 +47,10 @@ contract Treasury is Ownable2Step, ReentrancyGuard {
         }
     }
 
+    /// @dev Prevent accidental ownership renouncement which would permanently lock funds.
+    function renounceOwnership() public pure override {
+        revert("Renounce disabled");
+    }
+
     receive() external payable {}
 }

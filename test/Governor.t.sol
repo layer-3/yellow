@@ -2,20 +2,52 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
+import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
+import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
+
 import {NodeRegistry} from "../src/NodeRegistry.sol";
 import {YellowToken} from "../src/Token.sol";
 import {YellowGovernor} from "../src/Governor.sol";
 import {Treasury} from "../src/Treasury.sol";
 import {ILock} from "../src/interfaces/ILock.sol";
-import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
+
+/// @dev Test harness that exposes internal quorum floor update for testing.
+contract YellowGovernorHarness is YellowGovernor {
+    constructor(
+        IVotes locker_,
+        TimelockController timelock_,
+        uint48 votingDelay_,
+        uint32 votingPeriod_,
+        uint256 proposalThreshold_,
+        uint256 quorumNumerator_,
+        uint256 quorumFloor_,
+        uint48 voteExtension_,
+        address proposalGuardian_
+    )
+        YellowGovernor(
+            locker_,
+            timelock_,
+            votingDelay_,
+            votingPeriod_,
+            proposalThreshold_,
+            quorumNumerator_,
+            quorumFloor_,
+            voteExtension_,
+            proposalGuardian_
+        )
+    {}
+
+    function updateQuorumFloorUnsafe(uint256 newFloor) external {
+        _updateQuorumFloor(newFloor);
+    }
+}
 
 contract YellowGovernorTest is Test {
     YellowToken token;
     NodeRegistry locker;
     TimelockController timelock;
-    YellowGovernor governor;
+    YellowGovernorHarness governor;
     Treasury treasury;
 
     address deployer = address(1);
@@ -29,6 +61,7 @@ contract YellowGovernorTest is Test {
     uint256 constant PROPOSAL_THRESHOLD = 0; // no threshold for tests
     uint256 constant QUORUM_NUMERATOR = 4; // 4%
     uint256 constant QUORUM_FLOOR = 50_000 ether; // low floor for tests
+    uint48 constant VOTE_EXTENSION = 10; // 10 blocks for late-quorum tests
     uint256 constant TIMELOCK_DELAY = 1 days;
 
     uint256 constant LOCK_AMOUNT = 1_000_000 ether;
@@ -49,14 +82,16 @@ contract YellowGovernorTest is Test {
         timelock = new TimelockController(TIMELOCK_DELAY, proposers, executors, deployer);
 
         // Deploy governor
-        governor = new YellowGovernor(
+        governor = new YellowGovernorHarness(
             IVotes(address(locker)),
             timelock,
             VOTING_DELAY,
             VOTING_PERIOD,
             PROPOSAL_THRESHOLD,
             QUORUM_NUMERATOR,
-            QUORUM_FLOOR
+            QUORUM_FLOOR,
+            VOTE_EXTENSION,
+            foundation // proposal guardian = Foundation multisig
         );
 
         // Grant governor the proposer & canceller roles on timelock
@@ -81,13 +116,13 @@ contract YellowGovernorTest is Test {
         // Alice & bob approve and lock tokens, delegate to self
         vm.startPrank(alice);
         token.approve(address(locker), type(uint256).max);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(alice, LOCK_AMOUNT);
         locker.delegate(alice);
         vm.stopPrank();
 
         vm.startPrank(bob);
         token.approve(address(locker), type(uint256).max);
-        locker.lock(LOCK_AMOUNT);
+        locker.lock(bob, LOCK_AMOUNT);
         locker.delegate(bob);
         vm.stopPrank();
 
@@ -374,8 +409,8 @@ contract YellowGovernorTest is Test {
 
         // Alice withdraws and re-locks
         vm.startPrank(alice);
-        locker.withdraw();
-        locker.lock(LOCK_AMOUNT);
+        locker.withdraw(alice);
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
         vm.roll(block.number + 1);
@@ -486,33 +521,131 @@ contract YellowGovernorTest is Test {
         assertEq(governor.quorum(block.number - 1), expectedFractional);
     }
 
-    function test_quorumFloor_defeatsProposalWhenBelowFloor() public {
-        // Both unlock — total supply drops to 0
+    function test_quorumFloor_snapshotted_floorChangeDoesNotAffectExistingProposal() public {
+        // Both unlock so total supply drops to 0 — fractional quorum = 0,
+        // so quorum is entirely determined by the floor.
         vm.prank(alice);
         locker.unlock();
         vm.prank(bob);
         locker.unlock();
 
-        vm.roll(block.number + 1);
+        // Relock only alice with just enough to meet the current floor
+        vm.warp(block.timestamp + 14 days);
+        vm.startPrank(alice);
+        locker.withdraw(alice);
+        locker.lock(alice, QUORUM_FLOOR); // exactly 50_000
+        vm.stopPrank();
 
-        // Create proposal with 0 voting power available
+        vm.roll(10);
+
+        // Create proposal — snapshot taken now (floor = 50_000, supply = 50_000)
         uint256 proposalId = _createProposal();
-        vm.roll(block.number + VOTING_DELAY + 1);
+        vm.roll(10 + VOTING_DELAY + 1); // block 12
 
-        // Both vote for, but with 0 weight
+        // Alice votes for — her 50_000 meets the floor exactly
         vm.prank(alice);
         governor.castVote(proposalId, 1);
-        vm.prank(bob);
-        governor.castVote(proposalId, 1);
 
-        vm.roll(block.number + VOTING_PERIOD + 1);
+        // Governance raises the floor AFTER voting starts.
+        // With the M-01 fix (checkpointed), this should NOT affect the existing proposal.
+        // Without the fix (plain uint256), this WOULD retroactively break it.
+        vm.roll(20); // advance so clock() - 1 is valid for supply check
+        _setQuorumFloorDirectly(QUORUM_FLOOR * 2); // raise to 100_000
 
-        // Quorum floor = 50_000 ether, forVotes = 0 → defeated
-        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Defeated));
+        vm.roll(10 + VOTING_DELAY + VOTING_PERIOD + 2); // past voting end
+
+        // With snapshotted floor: quorum(snapshot) uses old floor (50_000) → proposal succeeds
+        // Without snapshot: quorum(snapshot) uses new floor (100_000) → proposal defeated
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Succeeded));
+    }
+
+    function test_quorumFloor_snapshotted_historicalLookup() public {
+        uint256 blockBefore = block.number;
+        vm.roll(block.number + 10);
+        assertEq(governor.quorumFloor(blockBefore), QUORUM_FLOOR);
     }
 
     // -------------------------------------------------------------------------
-    // Relock
+    // Late quorum protection
+    // -------------------------------------------------------------------------
+
+    function test_lateQuorum_extendsDeadlineWhenQuorumReachedLate() public {
+        uint256 proposalId = _createProposal();
+        vm.roll(block.number + VOTING_DELAY + 1);
+
+        uint256 originalDeadline = governor.proposalDeadline(proposalId);
+
+        // Advance to near the end of voting period (1 block before deadline)
+        vm.roll(originalDeadline);
+
+        // Alice casts the decisive vote that reaches quorum
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+        vm.prank(bob);
+        governor.castVote(proposalId, 1);
+
+        // Deadline should be extended by VOTE_EXTENSION
+        uint256 newDeadline = governor.proposalDeadline(proposalId);
+        assertGt(newDeadline, originalDeadline);
+    }
+
+    function test_lateQuorum_noExtensionWhenQuorumReachedEarly() public {
+        uint256 proposalId = _createProposal();
+        vm.roll(block.number + VOTING_DELAY + 1);
+
+        uint256 originalDeadline = governor.proposalDeadline(proposalId);
+
+        // Both vote immediately (far from deadline)
+        vm.prank(alice);
+        governor.castVote(proposalId, 1);
+        vm.prank(bob);
+        governor.castVote(proposalId, 1);
+
+        // Deadline should NOT be extended (quorum reached well before deadline)
+        assertEq(governor.proposalDeadline(proposalId), originalDeadline);
+    }
+
+    function test_lateQuorum_voteExtensionConfigured() public view {
+        assertEq(governor.lateQuorumVoteExtension(), VOTE_EXTENSION);
+    }
+
+    // -------------------------------------------------------------------------
+    // Proposal guardian
+    // -------------------------------------------------------------------------
+
+    function test_proposalGuardian_returnsFoundation() public view {
+        assertEq(governor.proposalGuardian(), foundation);
+    }
+
+    function test_proposalGuardian_canCancelProposal() public {
+        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
+            _dummyProposal();
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(targets, values, calldatas, description);
+
+        // Guardian cancels
+        vm.prank(foundation);
+        governor.cancel(targets, values, calldatas, keccak256(bytes(description)));
+
+        assertEq(uint256(governor.state(proposalId)), uint256(IGovernor.ProposalState.Canceled));
+    }
+
+    function test_proposalGuardian_nonGuardianCannotCancel() public {
+        (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
+            _dummyProposal();
+
+        vm.prank(alice);
+        governor.propose(targets, values, calldatas, description);
+
+        // Random user cannot cancel
+        vm.prank(bob);
+        vm.expectRevert();
+        governor.cancel(targets, values, calldatas, keccak256(bytes(description)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Relock — governance-specific (lock state tests are in Locker.t.sol)
     // -------------------------------------------------------------------------
 
     function test_relock_restoresVotingPower() public {
@@ -525,81 +658,35 @@ contract YellowGovernorTest is Test {
         vm.stopPrank();
     }
 
-    function test_relock_setsStateBackToLocked() public {
+    function test_relock_topUpAfterRelock_increasesVotingPower() public {
         vm.startPrank(alice);
         locker.unlock();
         locker.relock();
+        locker.lock(alice, LOCK_AMOUNT);
         vm.stopPrank();
 
-        assertEq(uint256(locker.lockStateOf(alice)), uint256(ILock.LockState.Locked));
-    }
-
-    function test_relock_clearsUnlockTimestamp() public {
-        vm.startPrank(alice);
-        locker.unlock();
-        locker.relock();
-        vm.stopPrank();
-
-        assertEq(locker.unlockTimestampOf(alice), 0);
-    }
-
-    function test_relock_emitsRelocked() public {
-        vm.prank(alice);
-        locker.unlock();
-
-        vm.prank(alice);
-        vm.expectEmit(true, false, false, true, address(locker));
-        emit ILock.Relocked(alice, LOCK_AMOUNT);
-        locker.relock();
-    }
-
-    function test_relock_revert_ifNotUnlocking() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
-        locker.relock();
-    }
-
-    function test_relock_revert_ifIdle() public {
-        address charlie = address(5);
-        vm.prank(charlie);
-        vm.expectRevert(abi.encodeWithSelector(ILock.NotUnlocking.selector));
-        locker.relock();
-    }
-
-    function test_relock_allowsTopUpAfterRelock() public {
-        vm.startPrank(alice);
-        locker.unlock();
-        locker.relock();
-        locker.lock(LOCK_AMOUNT);
-        vm.stopPrank();
-
-        assertEq(locker.balanceOf(alice), LOCK_AMOUNT * 2);
         assertEq(locker.getVotes(alice), LOCK_AMOUNT * 2);
     }
 
-    function test_relock_canUnlockAgainAfterRelock() public {
+    function test_relock_unlockAgainAfterRelock_removesVotingPower() public {
         vm.startPrank(alice);
         locker.unlock();
         locker.relock();
         locker.unlock();
         vm.stopPrank();
 
-        assertEq(uint256(locker.lockStateOf(alice)), uint256(ILock.LockState.Unlocking));
         assertEq(locker.getVotes(alice), 0);
     }
 
     function test_relock_restoresVotingUnits() public {
-        // Both alice and bob have votes
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
         assertEq(locker.getVotes(bob), LOCK_AMOUNT);
 
-        // Alice unlocks — her voting power drops
         vm.prank(alice);
         locker.unlock();
         assertEq(locker.getVotes(alice), 0);
         assertEq(locker.getVotes(bob), LOCK_AMOUNT);
 
-        // Alice relocks — her voting power restores
         vm.prank(alice);
         locker.relock();
         assertEq(locker.getVotes(alice), LOCK_AMOUNT);
@@ -684,5 +771,10 @@ contract YellowGovernorTest is Test {
         governor.castVote(proposalId, 1);
 
         vm.roll(block.number + VOTING_PERIOD + 1);
+    }
+
+    /// @dev Updates the quorum floor bypassing onlyGovernance for testing.
+    function _setQuorumFloorDirectly(uint256 newFloor) internal {
+        governor.updateQuorumFloorUnsafe(newFloor);
     }
 }

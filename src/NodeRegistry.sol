@@ -1,126 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.34;
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Votes} from "@openzeppelin/contracts/governance/utils/Votes.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import {ILock} from "./interfaces/ILock.sol";
+import {Locker} from "./Locker.sol";
+
+string constant NAME = "NodeRegistry";
+string constant VERSION = "1.0.0";
 
 /**
  * @title NodeRegistry
  * @notice Node operator registry with governance voting. Operators lock YELLOW
  *         tokens to register and gain voting power in the Yellow Network DAO.
  *         Extends OZ Votes to act as the voting-power source for governance.
- *         Users must call `delegate(self)` to activate their voting power.
+ *         Auto-self-delegates on first lock so voting power is immediately active.
  *
- * @dev ASSET is immutably set to YellowToken, a standard ERC-20 deployed by the
- *      same team in the same transaction. It has a fixed supply with no mint, burn,
- *      fee-on-transfer, or rebasing mechanics. The accounting in this vault relies
- *      on that invariant.
- *
- * Workflow:
- *   1. lock(amount)  — deposit tokens; can top-up while in Locked state.
- *   2. unlock()      — start the countdown.
- *   3. withdraw()    — after the period elapses, receive the full balance.
+ * @dev Voting units are granted on lock and removed on unlock/relock via hooks.
  */
-contract NodeRegistry is ILock, ReentrancyGuard, Votes {
-    using SafeERC20 for IERC20;
+contract NodeRegistry is Locker, Votes {
+    constructor(address asset_, uint256 unlockPeriod_) Locker(asset_, unlockPeriod_) EIP712(NAME, VERSION) {}
 
-    address public immutable ASSET;
-    uint256 public immutable NODE_UNLOCK_PERIOD;
-
-    mapping(address user => uint256 balance) internal _balances;
-    mapping(address user => uint256 unlockTimestamp) internal _unlockTimestamps;
-
-    constructor(address asset_, uint256 unlockPeriod_) EIP712("NodeRegistry", "1") {
-        if (asset_ == address(0)) revert InvalidAddress();
-        if (unlockPeriod_ == 0) revert InvalidAmount();
-        ASSET = asset_;
-        NODE_UNLOCK_PERIOD = unlockPeriod_;
+    function _afterLock(address target, uint256 amount) internal override {
+        // Transfer voting units first — when delegate is address(0) the vote
+        // movement is a no-op, but total supply checkpoints are updated.
+        _transferVotingUnits(address(0), target, amount);
+        // Auto-self-delegate on first lock so undelegated locks don't inflate
+        // quorum without producing votable power.
+        if (delegates(target) == address(0)) {
+            _delegate(target, target);
+        }
     }
 
-    /// @inheritdoc ILock
-    function asset() external view returns (address) {
-        return ASSET;
+    function _afterUnlock(address account, uint256 balance) internal override {
+        _transferVotingUnits(account, address(0), balance);
     }
 
-    /// @inheritdoc ILock
-    function lockStateOf(address user) public view returns (LockState) {
-        if (_balances[user] == 0) return LockState.Idle;
-        if (_unlockTimestamps[user] == 0) return LockState.Locked;
-        return LockState.Unlocking;
-    }
-
-    /// @inheritdoc ILock
-    function balanceOf(address user) external view returns (uint256) {
-        return _balances[user];
-    }
-
-    /// @inheritdoc ILock
-    function unlockTimestampOf(address user) external view returns (uint256) {
-        return _unlockTimestamps[user];
-    }
-
-    /// @inheritdoc ILock
-    function lock(uint256 amount) external nonReentrant {
-        if (amount == 0) revert InvalidAmount();
-        if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
-
-        uint256 balanceBefore = IERC20(ASSET).balanceOf(address(this));
-        IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amount);
-        uint256 received = IERC20(ASSET).balanceOf(address(this)) - balanceBefore;
-
-        uint256 newBalance = _balances[msg.sender] + received;
-        _balances[msg.sender] = newBalance;
-
-        _transferVotingUnits(address(0), msg.sender, received);
-
-        emit Locked(msg.sender, newBalance);
-    }
-
-    /// @inheritdoc ILock
-    function unlock() external {
-        uint256 balance = _balances[msg.sender];
-        if (balance == 0) revert NotLocked();
-        if (_unlockTimestamps[msg.sender] != 0) revert AlreadyUnlocking();
-
-        uint256 availableAt = block.timestamp + NODE_UNLOCK_PERIOD;
-        _unlockTimestamps[msg.sender] = availableAt;
-
-        _transferVotingUnits(msg.sender, address(0), balance);
-
-        emit UnlockInitiated(msg.sender, balance, availableAt);
-    }
-
-    /// @inheritdoc ILock
-    function relock() external {
-        if (_unlockTimestamps[msg.sender] == 0) revert NotUnlocking();
-
-        uint256 balance = _balances[msg.sender];
-        _unlockTimestamps[msg.sender] = 0;
-
-        _transferVotingUnits(address(0), msg.sender, balance);
-
-        emit Relocked(msg.sender, balance);
-    }
-
-    /// @inheritdoc ILock
-    function withdraw() external nonReentrant {
-        uint256 unlockTimestamp = _unlockTimestamps[msg.sender];
-        if (unlockTimestamp == 0) revert NotUnlocking();
-        if (block.timestamp < unlockTimestamp) revert UnlockPeriodNotElapsed(unlockTimestamp);
-
-        uint256 amount = _balances[msg.sender];
-
-        _balances[msg.sender] = 0;
-        _unlockTimestamps[msg.sender] = 0;
-
-        IERC20(ASSET).safeTransfer(msg.sender, amount);
-
-        emit Withdrawn(msg.sender, amount);
+    function _afterRelock(address account, uint256 balance) internal override {
+        _transferVotingUnits(address(0), account, balance);
     }
 
     /// @dev Returns the locked balance as voting units for the Votes system.
