@@ -6,6 +6,9 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import {Locker} from "./Locker.sol";
 
+string constant NAME = "NodeRegistry";
+string constant VERSION = "1.0.0";
+
 /**
  * @title NodeRegistry
  * @notice Node operator registry with governance voting. Operators lock YELLOW
@@ -16,7 +19,7 @@ import {Locker} from "./Locker.sol";
  * @dev Voting units are granted on lock and removed on unlock/relock via hooks.
  */
 contract NodeRegistry is Locker, Votes {
-    constructor(address asset_, uint256 unlockPeriod_) Locker(asset_, unlockPeriod_) EIP712("NodeRegistry", "1") {}
+    constructor(address asset_, uint256 unlockPeriod_) Locker(asset_, unlockPeriod_) EIP712(NAME, VERSION) {}
 
     function _afterLock(address target, uint256 amount) internal override {
         // Transfer voting units first — when delegate is address(0) the vote

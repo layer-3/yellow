@@ -2,36 +2,38 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {ILock} from "../src/interfaces/ILock.sol";
-import {ISlash} from "../src/interfaces/ISlash.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {AppRegistry} from "../src/AppRegistry.sol";
-import {YellowToken} from "../src/Token.sol";
+
 import {LockerTestBase} from "./Locker.t.sol";
 
+import {ILock} from "../src/interfaces/ILock.sol";
+import {ISlash} from "../src/interfaces/ISlash.sol";
+import {AppRegistry} from "../src/AppRegistry.sol";
+import {YellowToken} from "../src/Token.sol";
+
 /// @dev Runs all shared ILock tests against AppRegistry.
-contract AppRegistryLockerTest is LockerTestBase {
-    AppRegistry vault;
+contract AppRegistryTest_Locker is LockerTestBase {
+    AppRegistry appRegistry;
 
     function setUp() public override {
         token = new YellowToken(treasury);
-        vault = new AppRegistry(address(token), UNLOCK_PERIOD, treasury);
+        appRegistry = new AppRegistry(address(token), UNLOCK_PERIOD, treasury);
         super.setUp();
     }
 
     function _vault() internal view override returns (ILock) {
-        return ILock(address(vault));
+        return ILock(address(appRegistry));
     }
 
     function _vaultAddress() internal view override returns (address) {
-        return address(vault);
+        return address(appRegistry);
     }
 }
 
 // -------------------------------------------------------------------------
 // AppRegistry-specific: constructor
 // -------------------------------------------------------------------------
-contract AppRegistryConstructorTest is Test {
+contract AppRegistryTest_constructor is Test {
     function test_revert_ifAssetIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(ILock.InvalidAddress.selector));
         new AppRegistry(address(0), 14 days, address(this));
@@ -59,10 +61,10 @@ contract AppRegistryConstructorTest is Test {
 }
 
 // -------------------------------------------------------------------------
-// Slash tests (AppRegistry-specific)
+// Slash tests (AppRegistry-specific) — shared base
 // -------------------------------------------------------------------------
-contract AppRegistrySlashTest is Test {
-    AppRegistry vault;
+contract AppRegistryTest_slash_base is Test {
+    AppRegistry appRegistry;
     YellowToken token;
 
     address treasury = makeAddr("treasury");
@@ -74,11 +76,11 @@ contract AppRegistrySlashTest is Test {
     uint256 constant LOCK_AMOUNT = 1000 ether;
     bytes32 immutable ADJUDICATOR_ROLE = keccak256("ADJUDICATOR_ROLE");
 
-    function setUp() public {
+    function setUp() public virtual {
         token = new YellowToken(treasury);
-        vault = new AppRegistry(address(token), 14 days, owner);
+        appRegistry = new AppRegistry(address(token), 14 days, owner);
         vm.prank(owner);
-        vault.grantRole(ADJUDICATOR_ROLE, adjudicator);
+        appRegistry.grantRole(ADJUDICATOR_ROLE, adjudicator);
 
         vm.startPrank(treasury);
         require(token.transfer(alice, 10_000 ether));
@@ -86,184 +88,179 @@ contract AppRegistrySlashTest is Test {
         vm.stopPrank();
 
         vm.prank(alice);
-        token.approve(address(vault), type(uint256).max);
+        token.approve(address(appRegistry), type(uint256).max);
         vm.prank(bob);
-        token.approve(address(vault), type(uint256).max);
+        token.approve(address(appRegistry), type(uint256).max);
     }
+}
 
-    // -- access control --
+// -------------------------------------------------------------------------
+// Slash — access control
+// -------------------------------------------------------------------------
+contract AppRegistryTest_slash_accessControl is AppRegistryTest_slash_base {
+    function setUp() public override {
+        super.setUp();
+        vm.prank(alice);
+        appRegistry.lock(alice, LOCK_AMOUNT);
+    }
 
     function test_slash_revert_ifNotAdjudicator() public {
         vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
+        appRegistry.lock(alice, LOCK_AMOUNT);
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, ADJUDICATOR_ROLE)
         );
-        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, 100 ether, treasury, "0xDecisionHash");
     }
 
     function test_slash_revert_ifRecipientIsAdjudicator() public {
         vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
+        appRegistry.lock(alice, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
         vm.expectRevert(abi.encodeWithSelector(ISlash.RecipientIsAdjudicator.selector));
-        vault.slash(alice, 100 ether, adjudicator, "0xDecisionHash");
+        appRegistry.slash(alice, 100 ether, adjudicator, "0xDecisionHash");
     }
 
     function test_slash_revert_ifUserHasNoBalance() public {
         vm.prank(adjudicator);
         vm.expectRevert(abi.encodeWithSelector(ISlash.InsufficientBalance.selector));
-        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
+        appRegistry.slash(bob, 100 ether, treasury, "0xDecisionHash");
     }
 
     function test_slash_revert_ifAmountExceedsBalance() public {
-        vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-
         vm.prank(adjudicator);
         vm.expectRevert(abi.encodeWithSelector(ISlash.InsufficientBalance.selector));
-        vault.slash(alice, LOCK_AMOUNT + 1, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, LOCK_AMOUNT + 1, treasury, "0xDecisionHash");
     }
 
-    // -- while Locked --
+    // -------------------------------------------------------------------------
+    // Slash — while Locked
+    // -------------------------------------------------------------------------
 
     function test_slash_locked_partialSlash_reducesBalance() public {
-        vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-
         uint256 slashAmount = 300 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
-        assertEq(vault.balanceOf(alice), LOCK_AMOUNT - slashAmount);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - slashAmount);
+        assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Locked));
     }
 
     function test_slash_locked_partialSlash_transfersToRecipient() public {
-        vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-
         uint256 slashAmount = 300 ether;
         uint256 recipientBalBefore = token.balanceOf(treasury);
 
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
         assertEq(token.balanceOf(treasury), recipientBalBefore + slashAmount);
     }
 
     function test_slash_locked_fullSlash_resetsToIdle() public {
-        vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
+        assertEq(appRegistry.balanceOf(alice), 0);
+        assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Idle));
     }
 
     function test_slash_locked_emitsSlashed() public {
-        vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-
         uint256 slashAmount = 500 ether;
         vm.prank(adjudicator);
-        vm.expectEmit(true, true, false, true, address(vault));
+        vm.expectEmit(true, true, false, true, address(appRegistry));
         emit ISlash.Slashed(alice, slashAmount, treasury, "0xDecisionHash");
-        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, slashAmount, treasury, "0xDecisionHash");
+    }
+}
+
+// -------------------------------------------------------------------------
+// Slash — while Unlocking
+// -------------------------------------------------------------------------
+contract AppRegistrySlashTest_unlocking is AppRegistryTest_slash_base {
+    function setUp() public override {
+        super.setUp();
+        vm.startPrank(alice);
+        appRegistry.lock(alice, LOCK_AMOUNT);
+        appRegistry.unlock();
+        vm.stopPrank();
     }
 
-    // -- while Unlocking --
-
     function test_slash_unlocking_partialSlash_remainsUnlocking() public {
-        vm.startPrank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-        vault.unlock();
-        vm.stopPrank();
-
         uint256 slashAmount = 400 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
-        assertEq(vault.balanceOf(alice), LOCK_AMOUNT - slashAmount);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Unlocking));
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - slashAmount);
+        assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Unlocking));
     }
 
     function test_slash_unlocking_fullSlash_resetsToIdle() public {
-        vm.startPrank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-        vault.unlock();
-        vm.stopPrank();
-
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
-        assertEq(vault.balanceOf(alice), 0);
-        assertEq(vault.unlockTimestampOf(alice), 0);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Idle));
+        assertEq(appRegistry.balanceOf(alice), 0);
+        assertEq(appRegistry.unlockTimestampOf(alice), 0);
+        assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Idle));
     }
 
     function test_slash_unlocking_partialSlash_canStillWithdraw() public {
-        vm.startPrank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
-        vault.unlock();
-        vm.stopPrank();
-
         uint256 slashAmount = 200 ether;
         vm.prank(adjudicator);
-        vault.slash(alice, slashAmount, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, slashAmount, treasury, "0xDecisionHash");
 
         vm.warp(block.timestamp + 14 days);
 
         uint256 aliceBalBefore = token.balanceOf(alice);
         vm.prank(alice);
-        vault.withdraw(alice);
+        appRegistry.withdraw(alice);
 
         assertEq(token.balanceOf(alice), aliceBalBefore + LOCK_AMOUNT - slashAmount);
     }
+}
 
-    // -- edge cases --
-
+// -------------------------------------------------------------------------
+// Slash — edge cases
+// -------------------------------------------------------------------------
+contract AppRegistryTest_slash_edgeCases is AppRegistryTest_slash_base {
     function test_slash_multipleSlashes() public {
         vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
+        appRegistry.lock(alice, LOCK_AMOUNT);
 
         vm.startPrank(adjudicator);
-        vault.slash(alice, 100 ether, treasury, "0xDecisionHash");
-        vault.slash(alice, 200 ether, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, 100 ether, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, 200 ether, treasury, "0xDecisionHash");
         vm.stopPrank();
 
-        assertEq(vault.balanceOf(alice), LOCK_AMOUNT - 300 ether);
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - 300 ether);
     }
 
     function test_slash_independentPerUser() public {
         vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
+        appRegistry.lock(alice, LOCK_AMOUNT);
         vm.prank(bob);
-        vault.lock(bob, LOCK_AMOUNT);
+        appRegistry.lock(bob, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
-        vault.slash(alice, 500 ether, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, 500 ether, treasury, "0xDecisionHash");
 
-        assertEq(vault.balanceOf(alice), LOCK_AMOUNT - 500 ether);
-        assertEq(vault.balanceOf(bob), LOCK_AMOUNT);
+        assertEq(appRegistry.balanceOf(alice), LOCK_AMOUNT - 500 ether);
+        assertEq(appRegistry.balanceOf(bob), LOCK_AMOUNT);
     }
 
     function test_slash_fullSlash_thenCanLockAgain() public {
         vm.prank(alice);
-        vault.lock(alice, LOCK_AMOUNT);
+        appRegistry.lock(alice, LOCK_AMOUNT);
 
         vm.prank(adjudicator);
-        vault.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
+        appRegistry.slash(alice, LOCK_AMOUNT, treasury, "0xDecisionHash");
 
         vm.prank(alice);
-        vault.lock(alice, 500 ether);
+        appRegistry.lock(alice, 500 ether);
 
-        assertEq(vault.balanceOf(alice), 500 ether);
-        assertEq(uint256(vault.lockStateOf(alice)), uint256(ILock.LockState.Locked));
+        assertEq(appRegistry.balanceOf(alice), 500 ether);
+        assertEq(uint256(appRegistry.lockStateOf(alice)), uint256(ILock.LockState.Locked));
     }
 }
