@@ -60,6 +60,7 @@ abstract contract Locker is ILock, ReentrancyGuard {
 
     /// @inheritdoc ILock
     function lock(address target, uint256 amount) external nonReentrant {
+        if (target == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (_unlockTimestamps[target] != 0) revert AlreadyUnlocking();
 

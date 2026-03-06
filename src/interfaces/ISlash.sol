@@ -17,6 +17,9 @@ interface ISlash {
     /// @notice The recipient cannot be the adjudicator calling slash.
     error RecipientIsAdjudicator();
 
+    /// @notice The recipient cannot be the slashed user.
+    error RecipientIsUser();
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------

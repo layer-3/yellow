@@ -23,6 +23,11 @@ import {ISlash} from "./interfaces/ISlash.sol";
  *      variant used by node operators.
  *
  *      Slashing can occur in both Locked and Unlocking states.
+ *
+ *      Adjudicators are not economically incentivised by slash outcomes by design.
+ *      Dispute initiators pay the adjudicator's handling fee off-chain (similar to
+ *      arbitration forums / ODRP). This avoids creating perverse incentives around
+ *      decision outcomes.
  */
 contract AppRegistry is Locker, ISlash, AccessControl {
     using SafeERC20 for IERC20;
@@ -30,6 +35,8 @@ contract AppRegistry is Locker, ISlash, AccessControl {
     bytes32 public constant ADJUDICATOR_ROLE = keccak256("ADJUDICATOR_ROLE");
 
     /// @notice Minimum time (seconds) that must elapse between any two slash calls.
+    /// @dev The cooldown is intentionally global (not per-adjudicator). It is expected to be
+    ///      short. Governance can revoke the ADJUDICATOR_ROLE from abusive adjudicators.
     uint256 public slashCooldown;
 
     /// @notice Timestamp of the last successful slash.
@@ -66,6 +73,7 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         }
 
         require(recipient != msg.sender, RecipientIsAdjudicator());
+        require(recipient != user, RecipientIsUser());
 
         uint256 balance = _balances[user];
         require(balance != 0, InsufficientBalance());
