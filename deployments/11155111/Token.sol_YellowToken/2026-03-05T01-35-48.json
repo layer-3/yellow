@@ -1,0 +1,13 @@
+{
+  "deployer": "0xcde5187c9daf3e7869c2e3f4140b74e20726ba85",
+  "deployedTo": "0x236eB848C95b231299B4AA9f56c73D6893462720",
+  "transactionHash": "0x63f0464b77c43a4fba68de065fe1262d14024cf96a69822ce2c670507cd71b1e",
+  "commit": "935d84953c69fae36d7906563631e1287de1540e",
+  "timestamp": 1772674548,
+  "chainId": 11155111,
+  "contractPath": "src/Token.sol:YellowToken",
+  "constructorArgs": [
+    "0x56B32fC2aC69376Be2AEeF29154FB74b4Af109B1"
+  ],
+  "comment": " Official Test Token"
+}

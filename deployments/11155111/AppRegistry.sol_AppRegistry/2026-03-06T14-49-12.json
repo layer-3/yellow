@@ -1,0 +1,15 @@
+{
+  "deployer": "0xd29995d8511Fe2dc1031F2650f950Adf4ECceBAD",
+  "deployedTo": "0x89A969AE9D7e695DF948Ba744e72A97769C5C1ef",
+  "transactionHash": "0xdb7845a27dd3612f87be34d4b09a50bf9675370f791e8519785eb90bcaa6aead",
+  "commit": "8abb527264e478902212f455e1693cde57757ef9",
+  "timestamp": 1772808552,
+  "chainId": 11155111,
+  "contractPath": "./src/AppRegistry.sol:AppRegistry",
+  "constructorArgs": [
+    "0xB1aA0ac73B5E648a57db2d9342f11c471FcC85F1",
+    "600",
+    "0xF8bedb0aBa14833e95F29e760487C3d34Bc4Ec64"
+  ],
+  "comment": "clearnet-rc-1"
+}
