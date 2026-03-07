@@ -70,8 +70,9 @@ interface ILock {
     event Relocked(address indexed user, uint256 balance);
 
     /// @param user The user that withdrew.
+    /// @param destination The address that received the tokens.
     /// @param balance The amount withdrawn.
-    event Withdrawn(address indexed user, uint256 balance);
+    event Withdrawn(address indexed user, address indexed destination, uint256 balance);
 
     // -------------------------------------------------------------------------
     // View functions

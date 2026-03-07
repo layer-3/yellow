@@ -332,8 +332,8 @@ abstract contract LockerTestBase is Test {
         vm.warp(block.timestamp + UNLOCK_PERIOD);
 
         vm.prank(alice);
-        vm.expectEmit(true, false, false, true, _vaultAddress());
-        emit ILock.Withdrawn(alice, LOCK_AMOUNT);
+        vm.expectEmit(true, true, false, true, _vaultAddress());
+        emit ILock.Withdrawn(alice, alice, LOCK_AMOUNT);
         _vault().withdraw(alice);
     }
 

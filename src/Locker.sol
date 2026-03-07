@@ -118,7 +118,7 @@ abstract contract Locker is ILock, ReentrancyGuard {
 
         IERC20(ASSET).safeTransfer(destination, amount);
 
-        emit Withdrawn(account, amount);
+        emit Withdrawn(account, destination, amount);
     }
 
     /// @dev Hook called after tokens are locked. Override to add custom logic (e.g. collateral weight).
