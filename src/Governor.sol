@@ -113,6 +113,10 @@ contract YellowGovernor is
     function quorum(uint256 blockNumber) public view override(Governor, GovernorVotesQuorumFraction) returns (uint256) {
         uint256 fractionalQuorum = super.quorum(blockNumber);
         uint256 floor = quorumFloor(blockNumber);
+        // Cap floor at the timepoint's total supply so governance cannot deadlock
+        // when active voting power drops below the configured floor.
+        uint256 supply = token().getPastTotalSupply(blockNumber);
+        if (floor > supply) floor = supply;
         return fractionalQuorum > floor ? fractionalQuorum : floor;
     }
 

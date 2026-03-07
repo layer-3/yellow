@@ -500,8 +500,8 @@ contract YellowGovernorTest is Test {
         assertEq(governor.quorumFloor(), QUORUM_FLOOR);
     }
 
-    function test_quorumFloor_enforcedWhenSupplyDrops() public {
-        // Both unlock — fractional quorum would be 4% of 0 = 0
+    function test_quorumFloor_cappedAtSupplyWhenSupplyDrops() public {
+        // Both unlock — total supply drops to 0
         vm.prank(alice);
         locker.unlock();
         vm.prank(bob);
@@ -509,8 +509,8 @@ contract YellowGovernorTest is Test {
 
         vm.roll(block.number + 1);
 
-        // Quorum should be the floor, not 0
-        assertEq(governor.quorum(block.number - 1), QUORUM_FLOOR);
+        // Floor is capped at total supply (0) to prevent governance deadlock
+        assertEq(governor.quorum(block.number - 1), 0);
     }
 
     function test_quorumFloor_fractionalUsedWhenAboveFloor() public view {
