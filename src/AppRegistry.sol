@@ -34,13 +34,11 @@ contract AppRegistry is Locker, ISlash, AccessControl {
 
     bytes32 public constant ADJUDICATOR_ROLE = keccak256("ADJUDICATOR_ROLE");
 
-    /// @notice Minimum time (seconds) that must elapse between any two slash calls.
-    /// @dev The cooldown is intentionally global (not per-adjudicator). It is expected to be
-    ///      short. Governance can revoke the ADJUDICATOR_ROLE from abusive adjudicators.
+    /// @notice Minimum time (seconds) that must elapse between consecutive slashes by the same adjudicator.
     uint256 public slashCooldown;
 
-    /// @notice Timestamp of the last successful slash.
-    uint256 public lastSlashTimestamp;
+    /// @notice Timestamp of the last successful slash per adjudicator.
+    mapping(address => uint256) public lastSlashTimestamp;
 
     /// @notice Minimum slash amount. Slashes below this are rejected unless `amount == balance`
     ///         (full-balance slash). Prevents zero-amount or dust slashes from resetting the cooldown.
@@ -56,7 +54,7 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
     }
 
-    /// @notice Sets the global cooldown between slash calls.
+    /// @notice Sets the per-adjudicator cooldown between slash calls.
     /// @param newCooldown The new cooldown in seconds (0 disables the cooldown).
     function setSlashCooldown(uint256 newCooldown) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 oldCooldown = slashCooldown;
@@ -78,7 +76,7 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         onlyRole(ADJUDICATOR_ROLE)
         nonReentrant
     {
-        uint256 _lastSlash = lastSlashTimestamp;
+        uint256 _lastSlash = lastSlashTimestamp[msg.sender];
         uint256 _cooldown = slashCooldown;
         if (_cooldown != 0 && _lastSlash != 0) {
             uint256 availableAt = _lastSlash + _cooldown;
@@ -102,7 +100,7 @@ contract AppRegistry is Locker, ISlash, AccessControl {
             _unlockTimestamps[user] = 0;
         }
 
-        lastSlashTimestamp = block.timestamp;
+        lastSlashTimestamp[msg.sender] = block.timestamp;
 
         IERC20(ASSET).safeTransfer(recipient, amount);
 
