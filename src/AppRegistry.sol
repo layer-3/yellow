@@ -42,9 +42,14 @@ contract AppRegistry is Locker, ISlash, AccessControl {
     /// @notice Timestamp of the last successful slash.
     uint256 public lastSlashTimestamp;
 
+    /// @notice Minimum slash amount. Slashes below this are rejected unless `amount == balance`
+    ///         (full-balance slash). Prevents zero-amount or dust slashes from resetting the cooldown.
+    uint256 public minSlashAmount;
+
     error SlashCooldownActive(uint256 availableAt);
 
     event SlashCooldownUpdated(uint256 oldCooldown, uint256 newCooldown);
+    event MinSlashAmountUpdated(uint256 oldAmount, uint256 newAmount);
 
     constructor(address asset_, uint256 unlockPeriod_, address admin_) Locker(asset_, unlockPeriod_) {
         if (admin_ == address(0)) revert InvalidAddress();
@@ -57,6 +62,14 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         uint256 oldCooldown = slashCooldown;
         slashCooldown = newCooldown;
         emit SlashCooldownUpdated(oldCooldown, newCooldown);
+    }
+
+    /// @notice Sets the minimum slash amount.
+    /// @param newAmount The new minimum amount (0 disables the minimum).
+    function setMinSlashAmount(uint256 newAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 oldAmount = minSlashAmount;
+        minSlashAmount = newAmount;
+        emit MinSlashAmountUpdated(oldAmount, newAmount);
     }
 
     /// @inheritdoc ISlash
@@ -78,6 +91,8 @@ contract AppRegistry is Locker, ISlash, AccessControl {
         uint256 balance = _balances[user];
         require(balance != 0, InsufficientBalance());
         require(amount <= balance, InsufficientBalance());
+
+        require(minSlashAmount == 0 || amount >= minSlashAmount || amount == balance, SlashAmountTooLow());
 
         uint256 newBalance = balance - amount;
         _balances[user] = newBalance;

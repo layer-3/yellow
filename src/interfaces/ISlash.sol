@@ -20,6 +20,9 @@ interface ISlash {
     /// @notice The recipient cannot be the slashed user.
     error RecipientIsUser();
 
+    /// @notice The slash amount is below the minimum and does not equal the full balance.
+    error SlashAmountTooLow();
+
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
