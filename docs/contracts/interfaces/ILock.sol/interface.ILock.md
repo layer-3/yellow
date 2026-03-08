@@ -1,5 +1,5 @@
 # ILock
-[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/interfaces/ILock.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/081e9e5ab0ebd446958aa9ad2a2b9aa91b26a69c/src/interfaces/ILock.sol)
 
 **Title:**
 ILock
@@ -139,7 +139,7 @@ event Relocked(address indexed user, uint256 balance);
 ### Withdrawn
 
 ```solidity
-event Withdrawn(address indexed user, uint256 balance);
+event Withdrawn(address indexed user, address indexed destination, uint256 balance);
 ```
 
 **Parameters**
@@ -147,6 +147,7 @@ event Withdrawn(address indexed user, uint256 balance);
 |Name|Type|Description|
 |----|----|-----------|
 |`user`|`address`|The user that withdrew.|
+|`destination`|`address`|The address that received the tokens.|
 |`balance`|`uint256`|The amount withdrawn.|
 
 ## Errors

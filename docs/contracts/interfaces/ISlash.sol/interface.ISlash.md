@@ -1,5 +1,5 @@
 # ISlash
-[Git Source](https://github.com/layer-3/yellow/blob/f97fcc52ddfdc5918cb91b2af5538abb0060ee27/src/interfaces/ISlash.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/081e9e5ab0ebd446958aa9ad2a2b9aa91b26a69c/src/interfaces/ISlash.sol)
 
 **Title:**
 ISlash
@@ -59,5 +59,21 @@ The recipient cannot be the adjudicator calling slash.
 
 ```solidity
 error RecipientIsAdjudicator();
+```
+
+### RecipientIsUser
+The recipient cannot be the slashed user.
+
+
+```solidity
+error RecipientIsUser();
+```
+
+### SlashAmountTooLow
+The slash amount is below the minimum and does not equal the full balance.
+
+
+```solidity
+error SlashAmountTooLow();
 ```
 

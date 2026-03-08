@@ -25,13 +25,13 @@ import {
 |---|---|---|---|
 | `YellowTokenAbi` | YellowToken | 33 | ERC-20 + EIP-2612 permit |
 | `NodeRegistryAbi` | NodeRegistry | 48 | Staking + voting (ILock + IVotes) |
-| `AppRegistryAbi` | AppRegistry | 46 | Collateral + slashing (ILock + ISlash + AccessControl) |
+| `AppRegistryAbi` | AppRegistry | 51 | Collateral + slashing (ILock + ISlash + AccessControl) |
 | `YellowGovernorAbi` | YellowGovernor | 98 | Governance (Governor + extensions) |
 | `TimelockControllerAbi` | TimelockController | 46 | Delayed execution |
 | `TreasuryAbi` | Treasury | 16 | Foundation vault |
 | `FaucetAbi` | Faucet | 16 | Testnet faucet |
 | `ILockAbi` | ILock | 19 | Lock/unlock interface (shared by both registries) |
-| `ISlashAbi` | ISlash | 4 | Slash interface |
+| `ISlashAbi` | ISlash | 6 | Slash interface |
 
 ### Interface ABIs
 
