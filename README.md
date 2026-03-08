@@ -118,16 +118,28 @@ forge fmt
 
 ### Mainnet
 
-| Contract | Address |
-|---|---|
-| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` |
+| Contract | Address | Note |
+|---|---|---|
+| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` | |
+| Treasury | `0x914abaDC0e36e03f29e4F1516951125c774dBAc8` | Founder |
+| Treasury | `0xAec5157545635A7523EFB5ABe3a37F52dB7DE72e` | Community |
+| Treasury | `0xd572f3a0967856a09054578439aCe81B2f2ff88B` | Token Sale |
+| Treasury | `0xfD8E336757aE9cDc0766264064B51492814fCd47` | Foundation |
+| Treasury | `0xE277830b3444EA2cfee2B95F780c971222DEcfA9` | Network |
+| Treasury | `0xA8f52FFe4DeE9565505f8E390163A335D6A2F708` | Liquidity |
 
 ### Sepolia
 
-| Contract | Address |
-|---|---|
-| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` |
-| Faucet | `0x914abaDC0e36e03f29e4F1516951125c774dBAc8` |
+| Contract | Address | Note |
+|---|---|---|
+| YellowToken | `0x236eB848C95b231299B4AA9f56c73D6893462720` | |
+| Faucet | `0x914abaDC0e36e03f29e4F1516951125c774dBAc8` | |
+| Treasury | `0x6f4eeD96cA1388803A9923476a0F5e19703d1e7C` | Founder |
+| Treasury | `0x3939a80FE4cc2F16F1294a995A4255B68d8c1F27` | Community |
+| Treasury | `0x9b4742c0aEFfE3DD16c924f4630F6964fe1ad420` | Token Sale |
+| Treasury | `0xbb5006195974B1d3c36e46EA2D7665FE1e65ADf2` | Foundation |
+| Treasury | `0x72F4461A79AB44BbCf1E70c1e3CE9a5a2C2e1920` | Network |
+| Treasury | `0x5825BD45C3f495391f4a7690be581b1c91Ac6959` | Liquidity |
 
 ## Deployment
 
