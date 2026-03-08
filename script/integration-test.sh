@@ -82,9 +82,12 @@ pass "Token deployed"
 # ═════════════════════════════════════════════════════════════════
 step "Deploying Registry + Governance stack"
 
+# Use --mnemonics (same as deploy-registry.sh) to exercise that code path
+ANVIL_MNEMONIC="test test test test test test test test test test test junk"
 REGISTRY_OUTPUT=$(TOKEN_ADDRESS=$TOKEN \
   ADJUDICATOR_ADDRESS=$DEPLOYER \
   PROPOSAL_GUARDIAN=$DEPLOYER \
+  MNEMONIC="$ANVIL_MNEMONIC" \
   VOTING_DELAY=1 \
   VOTING_PERIOD=10 \
   PROPOSAL_THRESHOLD=0 \
@@ -95,7 +98,8 @@ REGISTRY_OUTPUT=$(TOKEN_ADDRESS=$TOKEN \
   forge script script/DeployRegistry.s.sol \
     --rpc-url "$RPC" \
     --broadcast \
-    --private-key "$DEPLOYER_PK" 2>&1)
+    --mnemonics "$ANVIL_MNEMONIC" \
+    --mnemonic-indexes 0 2>&1)
 
 NODE_REGISTRY=$(echo "$REGISTRY_OUTPUT" | grep "NodeRegistry:"        | awk '{print $2}')
 APP_REGISTRY=$(echo "$REGISTRY_OUTPUT"  | grep "AppRegistry:"         | awk '{print $2}')
@@ -123,7 +127,7 @@ TREASURY_OUTPUT=$(FOUNDATION_ADDRESS=$TIMELOCK \
     --broadcast \
     --private-key "$DEPLOYER_PK" 2>&1)
 
-TREASURY=$(echo "$TREASURY_OUTPUT" | grep "Treasury:" | awk '{print $2}')
+TREASURY=$(echo "$TREASURY_OUTPUT" | grep "Treasury:" | head -1 | awk '{print $2}')
 [[ -n "$TREASURY" ]] || fail "Could not parse TREASURY address from deploy output"
 echo "  Treasury: $TREASURY"
 
@@ -131,7 +135,7 @@ OWNER=$(call "$TREASURY" "owner()(address)")
 assert_eq "$OWNER" "$TIMELOCK" "Treasury owned by Timelock"
 
 TNAME=$(call "$TREASURY" "name()(string)" | tr -d '"')
-assert_eq "$TNAME" "Treasury" "Treasury name"
+assert_eq "$TNAME" "Founder" "Treasury name"
 pass "Treasury deployed"
 
 # ═════════════════════════════════════════════════════════════════

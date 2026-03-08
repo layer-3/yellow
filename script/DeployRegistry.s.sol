@@ -45,14 +45,16 @@ contract DeployRegistry is Script {
         uint256 appUnlockPeriod = vm.envOr("APP_UNLOCK_PERIOD", uint256(14 days));
         uint256 timelockDelay = vm.envOr("TIMELOCK_DELAY", uint256(172_800));
 
-        vm.startBroadcast();
+        uint256 deployerKey = vm.envOr("PRIVATE_KEY", vm.deriveKey(vm.envString("MNEMONIC"), 0));
+        address deployer = vm.addr(deployerKey);
+        vm.startBroadcast(deployerKey);
 
         // 1. NodeRegistry (node operators, with voting)
         NodeRegistry nodeRegistry = new NodeRegistry(tokenAddress, unlockPeriod);
         console.log("NodeRegistry:", address(nodeRegistry));
 
         // 2. AppRegistry (deployer as temp admin for role setup)
-        AppRegistry appRegistry = new AppRegistry(tokenAddress, appUnlockPeriod, msg.sender);
+        AppRegistry appRegistry = new AppRegistry(tokenAddress, appUnlockPeriod, deployer);
         console.log("AppRegistry:", address(appRegistry));
 
         // 3. TimelockController (deployer as temp admin, no proposers yet)
@@ -63,7 +65,7 @@ contract DeployRegistry is Script {
             timelockDelay,
             proposers,
             executors,
-            msg.sender // temp admin
+            deployer // temp admin
         );
         console.log("TimelockController:", address(timelock));
 
@@ -88,10 +90,10 @@ contract DeployRegistry is Script {
         // 6. Wire AppRegistry roles: grant adjudicator, transfer admin to timelock
         appRegistry.grantRole(appRegistry.ADJUDICATOR_ROLE(), adjudicatorAddress);
         appRegistry.grantRole(appRegistry.DEFAULT_ADMIN_ROLE(), address(timelock));
-        appRegistry.renounceRole(appRegistry.DEFAULT_ADMIN_ROLE(), msg.sender);
+        appRegistry.renounceRole(appRegistry.DEFAULT_ADMIN_ROLE(), deployer);
 
         // 7. Renounce deployer admin on timelock
-        timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), msg.sender);
+        timelock.renounceRole(timelock.DEFAULT_ADMIN_ROLE(), deployer);
 
         vm.stopBroadcast();
 

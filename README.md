@@ -127,6 +127,10 @@ forge fmt
 | Treasury | `0xfD8E336757aE9cDc0766264064B51492814fCd47` | Foundation |
 | Treasury | `0xE277830b3444EA2cfee2B95F780c971222DEcfA9` | Network |
 | Treasury | `0xA8f52FFe4DeE9565505f8E390163A335D6A2F708` | Liquidity |
+| NodeRegistry | `0xB0C7aA4ca9ffF4A48B184d8425eb5B6Fa772d820` | |
+| AppRegistry | `0x5A70029B843eE272A2392acE21DA392693eef1c6` | |
+| TimelockController | `0x9530896F9622b925c37dF5Cfa271cc9deBB226b7` | |
+| YellowGovernor | `0x7Ce0AE21E11dFEDA2F6e4D8bF2749E4061119512` | |
 
 ### Sepolia
 

@@ -1,5 +1,5 @@
 # ILock
-[Git Source](https://github.com/layer-3/yellow/blob/081e9e5ab0ebd446958aa9ad2a2b9aa91b26a69c/src/interfaces/ILock.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/a45ce0fdd3efc1ef5c26da97c2679bcce400d764/src/interfaces/ILock.sol)
 
 **Title:**
 ILock

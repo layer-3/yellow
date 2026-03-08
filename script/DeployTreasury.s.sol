@@ -18,14 +18,7 @@ contract DeployTreasury is Script {
     function run() external {
         address foundation = vm.envAddress("FOUNDATION_ADDRESS");
 
-        string[6] memory names = [
-            "Founder",
-            "Community",
-            "Token Sale",
-            "Foundation",
-            "Network",
-            "Liquidity"
-        ];
+        string[6] memory names = ["Founder", "Community", "Token Sale", "Foundation", "Network", "Liquidity"];
 
         vm.startBroadcast();
 
