@@ -6,25 +6,37 @@ import {Treasury} from "../src/Treasury.sol";
 
 /**
  * @title DeployTreasury
- * @notice Deploys a Treasury instance owned by the Foundation.
+ * @notice Deploys all Treasury instances, each owned by the Foundation multisig.
  *
  * Environment variables:
- *   FOUNDATION_ADDRESS — address that owns the Treasury
- *   TREASURY_NAME      — human-readable label (default: "Treasury")
+ *   FOUNDATION_ADDRESS — address that owns every Treasury
  *
  * Usage:
  *   forge script script/DeployTreasury.s.sol --rpc-url <RPC> --broadcast --verify
  */
 contract DeployTreasury is Script {
     function run() external {
-        address foundationAddress = vm.envAddress("FOUNDATION_ADDRESS");
-        string memory treasuryName = vm.envOr("TREASURY_NAME", string("Treasury"));
+        address foundation = vm.envAddress("FOUNDATION_ADDRESS");
+
+        string[6] memory names = [
+            "Founder",
+            "Community",
+            "Token Sale",
+            "Foundation",
+            "Network",
+            "Liquidity"
+        ];
 
         vm.startBroadcast();
 
-        Treasury treasury = new Treasury(foundationAddress, treasuryName);
-        console.log("Treasury:", address(treasury), "-", treasuryName);
+        for (uint256 i = 0; i < names.length; i++) {
+            Treasury treasury = new Treasury(foundation, names[i]);
+            console.log("Treasury:", address(treasury), "-", names[i]);
+        }
 
         vm.stopBroadcast();
+
+        console.log("");
+        console.log("--- Treasury deployment complete ---");
     }
 }
