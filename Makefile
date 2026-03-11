@@ -102,27 +102,31 @@ sdk-extract:
 docs:
 	bun run script/build-docs.ts
 
-# Release — usage: make release v=0.2.0
+# Release — usage: make release [v=1.2.3]
+# Defaults to patch bump if v is not specified.
 release:
-	@if [ -z "$(v)" ]; then echo "Usage: make release v=0.2.0"; exit 1; fi
+	$(eval v := $(or $(v),$(shell cd sdk && bun -e "const s=require('./package.json').version.split('.');s[2]=+s[2]+1;console.log(s.join('.'))")))
+	@echo "==> Releasing v$(v)"
 	@echo "==> Running checks..."
 	forge fmt --check
 	forge test -vvv
+	cd sdk && bun run lint
 	@echo "==> Updating sdk/package.json version to $(v)..."
 	cd sdk && npm version "$(v)" --no-git-tag-version
 	@echo "==> Building SDK..."
 	$(MAKE) sdk-build
+	@echo "==> Running SDK tests..."
+	cd sdk && bun test
 	@echo "==> Building docs..."
 	$(MAKE) docs
 	@echo "==> Committing generated files..."
 	git add docs/ sdk/package.json sdk/README.md
-	git diff --cached --quiet || git commit -m "chore: regenerate docs and SDK for v$(v)"
+	git diff --cached --quiet || git commit -m "chore: release v$(v)"
 	@echo "==> Tagging v$(v)..."
 	git tag -a "v$(v)" -m "Release v$(v)"
 	@echo ""
-	@echo "Release v$(v) tagged. To publish:"
+	@echo "Release v$(v) tagged. Push to publish:"
 	@echo "  git push origin master --tags"
-	@echo "  cd sdk && npm publish"
 
 # Dependencies
 install:
