@@ -40,6 +40,9 @@ jobs:
       - name: Install SDK deps
         run: cd sdk && bun install --frozen-lockfile
 
+      - name: Lint SDK
+        run: cd sdk && bun run lint
+
       - name: Set version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -47,6 +50,9 @@ jobs:
 
       - name: Build SDK
         run: cd sdk && bun run build
+
+      - name: Test SDK
+        run: cd sdk && bun test
 
       - name: Publish to npm
         run: |

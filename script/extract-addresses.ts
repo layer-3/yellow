@@ -9,25 +9,32 @@
  */
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { CHAINS } from "./contracts";
+import { CHAINS, TREASURY_KEYS } from "./contracts";
 
 const ROOT = join(import.meta.dirname, "..");
 const BROADCAST_DIR = join(ROOT, "broadcast");
 const OUT_FILE = join(ROOT, "sdk", "src", "addresses.ts");
 
-/** Maps Forge contractName → SDK address key, in display order. */
-const CONTRACT_KEY: [contractName: string, addressKey: string][] = [
-  ["YellowToken", "yellowToken"],
-  ["NodeRegistry", "nodeRegistry"],
-  ["AppRegistry", "appRegistry"],
-  ["YellowGovernor", "governor"],
-  ["TimelockController", "timelock"],
-  ["Treasury", "treasury"],
-  ["Faucet", "faucet"],
-];
+/** Maps Forge contractName → SDK address key (for non-Treasury contracts). */
+const CONTRACT_MAP: Record<string, string> = {
+  YellowToken: "yellowToken",
+  NodeRegistry: "nodeRegistry",
+  AppRegistry: "appRegistry",
+  YellowGovernor: "governor",
+  TimelockController: "timelock",
+  Faucet: "faucet",
+};
 
-const CONTRACT_MAP = Object.fromEntries(CONTRACT_KEY);
-const KEY_ORDER = CONTRACT_KEY.map(([, k]) => k);
+/** Canonical key order for output. */
+const KEY_ORDER = [
+  "yellowToken",
+  "nodeRegistry",
+  "appRegistry",
+  "governor",
+  "timelock",
+  ...Object.values(TREASURY_KEYS),
+  "faucet",
+];
 
 /** EIP-55 mixed-case checksum via Foundry's `cast`. */
 async function toChecksumAddress(addr: string): Promise<string> {
@@ -40,6 +47,7 @@ type Tx = {
   transactionType: string;
   contractName: string;
   contractAddress: string;
+  arguments?: string[];
 };
 
 type BroadcastFile = {
@@ -69,7 +77,17 @@ async function main() {
 
       for (const tx of broadcast.transactions) {
         if (tx.transactionType !== "CREATE") continue;
-        const key = CONTRACT_MAP[tx.contractName];
+
+        let key: string | undefined;
+
+        if (tx.contractName === "Treasury") {
+          // Multiple Treasury instances — use constructor name arg to distinguish
+          const name = tx.arguments?.[1];
+          if (name) key = TREASURY_KEYS[name];
+        } else {
+          key = CONTRACT_MAP[tx.contractName];
+        }
+
         if (!key) continue;
 
         const addr = await toChecksumAddress(tx.contractAddress);
@@ -91,7 +109,9 @@ async function main() {
     `  appRegistry: \`0x\${string}\`;`,
     `  governor: \`0x\${string}\`;`,
     `  timelock: \`0x\${string}\`;`,
-    `  treasury: \`0x\${string}\`;`,
+    ...Object.values(TREASURY_KEYS).map(
+      (k) => `  ${k}: \`0x\${string}\`;`
+    ),
     `  faucet?: \`0x\${string}\`;`,
     `};`,
     ``,

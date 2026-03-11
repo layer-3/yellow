@@ -15,7 +15,8 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    }
+    },
+    "./abi/*.json": "./abi/*.json"
   },
   "description": "Typed ABIs and deployed addresses for Yellow Network smart contracts",
   "repository": {
@@ -29,14 +30,19 @@
   },
   "files": [
     "dist",
+    "abi",
     "README.md"
   ],
   "scripts": {
     "extract": "bun run ../script/extract-abis.ts && bun run ../script/extract-addresses.ts",
     "build": "bun run extract && tsup",
+    "test": "bun test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "tsup": "^8",
     "typescript": "^5"
   }

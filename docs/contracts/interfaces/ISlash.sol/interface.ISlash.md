@@ -1,5 +1,5 @@
 # ISlash
-[Git Source](https://github.com/layer-3/yellow/blob/a45ce0fdd3efc1ef5c26da97c2679bcce400d764/src/interfaces/ISlash.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/7e0c9cbd0769ff18f8d6b1997b981401b5b19277/src/interfaces/ISlash.sol)
 
 **Title:**
 ISlash

@@ -88,6 +88,12 @@ deploy-treasury-mainnet:
 sdk-build:
 	cd sdk && bun install && bun run build
 
+sdk-lint:
+	cd sdk && bun run lint
+
+sdk-lint-fix:
+	cd sdk && bun run lint:fix
+
 sdk-extract:
 	bun run script/extract-abis.ts
 	bun run script/extract-addresses.ts
@@ -109,7 +115,7 @@ release:
 	@echo "==> Building docs..."
 	$(MAKE) docs
 	@echo "==> Committing generated files..."
-	git add docs/ sdk/package.json
+	git add docs/ sdk/package.json sdk/README.md
 	git diff --cached --quiet || git commit -m "chore: regenerate docs and SDK for v$(v)"
 	@echo "==> Tagging v$(v)..."
 	git tag -a "v$(v)" -m "Release v$(v)"
@@ -136,5 +142,5 @@ sizes:
 	deploy-faucet-sepolia deploy-faucet-mainnet \
 	deploy-registry-sepolia deploy-registry-mainnet \
 	deploy-treasury-sepolia deploy-treasury-mainnet \
-	sdk-build sdk-extract docs release \
+	sdk-build sdk-lint sdk-lint-fix sdk-extract docs release \
 	install update sizes

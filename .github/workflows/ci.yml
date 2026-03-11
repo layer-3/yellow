@@ -34,7 +34,9 @@ jobs:
 
       - run: forge build
       - run: cd sdk && bun install --frozen-lockfile
+      - run: cd sdk && bun run lint
       - run: cd sdk && bun run build
+      - run: cd sdk && bun test
 
       - uses: actions/upload-artifact@v4
         with:

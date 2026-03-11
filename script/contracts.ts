@@ -41,6 +41,24 @@ export const ADDRESS_LABELS: Record<string, string> = {
   appRegistry: "AppRegistry",
   governor: "YellowGovernor",
   timelock: "TimelockController",
-  treasury: "Treasury",
+  treasuryFounder: "Treasury (Founder)",
+  treasuryCommunity: "Treasury (Community)",
+  treasuryTokenSale: "Treasury (Token Sale)",
+  treasuryFoundation: "Treasury (Foundation)",
+  treasuryNetwork: "Treasury (Network)",
+  treasuryLiquidity: "Treasury (Liquidity)",
   faucet: "Faucet",
+};
+
+/**
+ * Maps Treasury constructor name argument → SDK address key.
+ * Used by extract-addresses.ts to distinguish multiple Treasury instances.
+ */
+export const TREASURY_KEYS: Record<string, string> = {
+  Founder: "treasuryFounder",
+  Community: "treasuryCommunity",
+  "Token Sale": "treasuryTokenSale",
+  Foundation: "treasuryFoundation",
+  Network: "treasuryNetwork",
+  Liquidity: "treasuryLiquidity",
 };

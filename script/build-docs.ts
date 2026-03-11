@@ -9,14 +9,16 @@
 import { execSync } from "node:child_process";
 import { cp, rm, access, readFile, writeFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { CONTRACTS, LABELS, CHAINS, ADDRESS_LABELS } from "./contracts";
+import { CONTRACTS, LABELS, CHAINS, ADDRESS_LABELS, TREASURY_KEYS } from "./contracts";
 import { addresses } from "../sdk/src/addresses";
 
 const ROOT = join(import.meta.dirname, "..");
 const OUT_DIR = join(ROOT, "out");
 const DOCS_DIR = join(ROOT, "docs");
+const SDK_DIR = join(ROOT, "sdk");
 const CONTRACTS_DIR = join(DOCS_DIR, "contracts");
 const FORGE_DOC_TMP = join(ROOT, ".forge-doc-tmp");
+const SDK_README_TMPL = join(ROOT, "script", "sdk-readme.md.tmpl");
 
 // Hand-written pages that must exist (relative to docs/)
 const REQUIRED_PAGES = [
@@ -199,7 +201,9 @@ async function generateApiReference(): Promise<string> {
     '  appRegistry: `0x${string}`;',
     '  governor: `0x${string}`;',
     '  timelock: `0x${string}`;',
-    '  treasury: `0x${string}`;',
+    ...Object.values(TREASURY_KEYS).map(
+      (k) => `  ${k}: \`0x\${string}\`;`
+    ),
     '  faucet?: `0x${string}`;  // testnet only',
     "};",
     "```",
@@ -342,18 +346,70 @@ async function generateEvents(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Generator: sdk/README.md (from template)
+// ---------------------------------------------------------------------------
+async function generateSdkReadme(): Promise<string> {
+  let tmpl = await readFile(SDK_README_TMPL, "utf-8");
+
+  // {{abi_imports}}
+  const abiImports = Object.keys(CONTRACTS)
+    .map((n) => `  ${n}Abi,`)
+    .join("\n");
+
+  // {{abi_table}}
+  const abiTable = Object.entries(CONTRACTS)
+    .map(([name]) => {
+      const label = LABELS[name] ?? "";
+      return `| \`${name}Abi\` | ${name} | ${label} |`;
+    })
+    .join("\n");
+
+  // {{deployed_addresses}}
+  const sections: string[] = [];
+  for (const [chainIdStr, addrs] of Object.entries(addresses)) {
+    const chainId = Number(chainIdStr);
+    const chain = CHAINS[chainId];
+    if (!chain) continue;
+
+    const rows: string[] = [];
+    for (const [key, label] of Object.entries(ADDRESS_LABELS)) {
+      const addr = (addrs as Record<string, string | undefined>)[key];
+      if (addr) {
+        rows.push(`| ${label} | [\`${addr}\`](${chain.explorer}/${addr}) |`);
+      }
+    }
+
+    if (rows.length > 0) {
+      sections.push(
+        `### ${chain.name} (Chain ID: ${chainId})\n`,
+        "| Contract | Address |",
+        "|---|---|",
+        ...rows,
+        "",
+      );
+    }
+  }
+
+  tmpl = tmpl.replace("{{abi_imports}}", abiImports);
+  tmpl = tmpl.replace("{{abi_table}}", abiTable);
+  tmpl = tmpl.replace("{{deployed_addresses}}", sections.join("\n"));
+
+  return tmpl;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
   console.log("Building docs...\n");
 
   // 1. Forge doc
-  console.log("[1/5] Generating contract docs with forge doc");
+  console.log("[1/6] Generating contract docs with forge doc");
   await rm(FORGE_DOC_TMP, { recursive: true, force: true });
   run(`forge doc --out "${FORGE_DOC_TMP}"`);
 
   // 2. Replace docs/contracts/
-  console.log("\n[2/5] Updating docs/contracts/");
+  console.log("\n[2/6] Updating docs/contracts/");
   const srcDir = join(FORGE_DOC_TMP, "src", "src");
   if (!(await exists(srcDir))) {
     console.error(`Expected forge doc output at ${srcDir}`);
@@ -366,7 +422,7 @@ async function main() {
   console.log(`  ${contractPages} contract pages generated`);
 
   // 3. Auto-generate pages
-  console.log("\n[3/5] Auto-generating pages");
+  console.log("\n[3/6] Auto-generating pages");
 
   await mkdir(join(DOCS_DIR, "operations"), { recursive: true });
   await mkdir(join(DOCS_DIR, "sdk"), { recursive: true });
@@ -384,8 +440,14 @@ async function main() {
   await writeFile(join(DOCS_DIR, "integration/events.md"), eventsMd);
   console.log("  generated  integration/events.md");
 
-  // 4. Validate hand-written pages
-  console.log("\n[4/5] Validating hand-written pages");
+  // 4. Generate sdk/README.md from template
+  console.log("\n[4/6] Generating sdk/README.md");
+  const sdkReadmeMd = await generateSdkReadme();
+  await writeFile(join(SDK_DIR, "README.md"), sdkReadmeMd);
+  console.log("  generated  sdk/README.md");
+
+  // 5. Validate hand-written pages
+  console.log("\n[5/6] Validating hand-written pages");
   const missing: string[] = [];
   for (const page of REQUIRED_PAGES) {
     const full = join(DOCS_DIR, page);
@@ -404,11 +466,11 @@ async function main() {
     process.exit(1);
   }
 
-  // 5. Summary
+  // 6. Summary
   const totalPages = await countFiles(DOCS_DIR, ".md");
-  console.log(`\n[5/5] Done`);
+  console.log(`\n[6/6] Done`);
   console.log(`  ${contractPages} contract API pages (forge doc)`);
-  console.log(`  ${GENERATED_PAGES.length} auto-generated pages`);
+  console.log(`  ${GENERATED_PAGES.length + 1} auto-generated pages (${GENERATED_PAGES.length} docs + sdk/README.md)`);
   console.log(`  ${REQUIRED_PAGES.length} hand-written pages (validated)`);
   console.log(`  ${totalPages} total markdown files in docs/`);
 }

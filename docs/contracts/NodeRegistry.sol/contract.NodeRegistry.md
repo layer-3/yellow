@@ -1,5 +1,5 @@
 # NodeRegistry
-[Git Source](https://github.com/layer-3/yellow/blob/a45ce0fdd3efc1ef5c26da97c2679bcce400d764/src/NodeRegistry.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/7e0c9cbd0769ff18f8d6b1997b981401b5b19277/src/NodeRegistry.sol)
 
 **Inherits:**
 [Locker](/src/Locker.sol/abstract.Locker.md), Votes
