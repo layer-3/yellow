@@ -43,11 +43,6 @@ jobs:
       - name: Lint SDK
         run: cd sdk && bun run lint
 
-      - name: Set version from tag
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cd sdk && npm version "$VERSION" --no-git-tag-version
-
       - name: Build SDK
         run: cd sdk && bun run build
 

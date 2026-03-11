@@ -1,5 +1,5 @@
 # YellowToken
-[Git Source](https://github.com/layer-3/yellow/blob/8ba89f80b430061b5cbfdc63052584f1982e140b/src/Token.sol)
+[Git Source](https://github.com/layer-3/yellow/blob/11ed85c3dabaaddeee431052032791a80eaf2a0e/src/Token.sol)
 
 **Inherits:**
 ERC20Permit
