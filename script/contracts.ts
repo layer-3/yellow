@@ -47,6 +47,7 @@ export const ADDRESS_LABELS: Record<string, string> = {
   treasuryFoundation: "Treasury (Foundation)",
   treasuryNetwork: "Treasury (Network)",
   treasuryLiquidity: "Treasury (Liquidity)",
+  treasuryBridgedTokensXRPL: "Treasury (Bridged Tokens XRPL)",
   faucet: "Faucet",
 };
 
@@ -61,4 +62,5 @@ export const TREASURY_KEYS: Record<string, string> = {
   Foundation: "treasuryFoundation",
   Network: "treasuryNetwork",
   Liquidity: "treasuryLiquidity",
+  "Bridged Tokens XRPL": "treasuryBridgedTokensXRPL",
 };

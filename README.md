@@ -127,6 +127,7 @@ forge fmt
 | Treasury | `0xfD8E336757aE9cDc0766264064B51492814fCd47` | Foundation |
 | Treasury | `0xE277830b3444EA2cfee2B95F780c971222DEcfA9` | Network |
 | Treasury | `0xA8f52FFe4DeE9565505f8E390163A335D6A2F708` | Liquidity |
+| Treasury | `0xeDE263567477d6656595d4A6B2ff4DdE0A9cDf1b` | Bridged XRPL |
 | NodeRegistry | `0xB0C7aA4ca9ffF4A48B184d8425eb5B6Fa772d820` | |
 | AppRegistry | `0x5A70029B843eE272A2392acE21DA392693eef1c6` | |
 | TimelockController | `0x9530896F9622b925c37dF5Cfa271cc9deBB226b7` | |
@@ -144,6 +145,7 @@ forge fmt
 | Treasury | `0xbb5006195974B1d3c36e46EA2D7665FE1e65ADf2` | Foundation |
 | Treasury | `0x72F4461A79AB44BbCf1E70c1e3CE9a5a2C2e1920` | Network |
 | Treasury | `0x5825BD45C3f495391f4a7690be581b1c91Ac6959` | Liquidity |
+| Treasury | `0xDED5610cAF76F5fA46f43495b027287f48081e20` | Bridged XRPL |
 
 ## Deployment
 
